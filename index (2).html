@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diete · Clienti</title>
+<style>
+  :root {
+    --bg: #f5f6f4; --surface: #ffffff; --ink: #1d2a28; --muted: #66736f;
+    --line: #dde3df; --accent: #1f6f5c; --accent-ink: #ffffff; --danger: #b3322b;
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  h1, h2 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  .hidden { display: none !important; }
+
+  /* Bottoni */
+  .btn { border: 1px solid var(--line); background: var(--surface); padding: 9px 16px; border-radius: var(--radius); cursor: pointer; }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn.danger { color: var(--danger); }
+  .btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, .row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* Campi */
+  label { display: block; font-size: 14px; color: var(--muted); margin-bottom: 4px; }
+  input, select, textarea { width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+  textarea { min-height: 76px; resize: vertical; }
+
+  /* Login */
+  #login { min-height: 100vh; display: grid; place-items: center; padding: 20px; }
+  .login-box { width: 100%; max-width: 380px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 28px; }
+  .login-box h1 { font-size: 24px; margin-bottom: 4px; }
+  .login-box p { margin: 0 0 22px; color: var(--muted); }
+  .login-box .field { margin-bottom: 14px; }
+  .login-box .btn { width: 100%; margin-top: 6px; }
+
+  /* App */
+  header.top { background: var(--surface); border-bottom: 1px solid var(--line); }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 20px; }
+  header.top .wrap { display: flex; align-items: center; justify-content: space-between; height: 60px; }
+  header.top h1 { font-size: 19px; }
+  main.wrap { padding-top: 28px; padding-bottom: 60px; }
+  .toolbar { display: flex; gap: 12px; margin-bottom: 18px; }
+  .toolbar input { flex: 1; }
+  .count { color: var(--muted); font-size: 14px; margin: 0 0 10px; }
+
+  .list { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .row { display: grid; grid-template-columns: 1.6fr 1fr 1.4fr auto; gap: 14px; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .row:last-child { border-bottom: 0; }
+  .row:hover { background: #f1f5f3; }
+  .row .name { font-weight: 600; }
+  .row .sub, .row .goal { color: var(--muted); font-size: 14px; }
+  .row .goal { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .empty { padding: 40px 20px; text-align: center; color: var(--muted); }
+
+  /* Finestra cliente */
+  dialog { border: 0; border-radius: 12px; padding: 0; width: min(640px, calc(100vw - 24px)); max-height: calc(100vh - 24px); color: var(--ink); background: var(--surface); }
+  dialog::backdrop { background: rgba(20, 30, 28, .45); }
+  .dlg-head { padding: 20px 24px 8px; }
+  .dlg-body { padding: 8px 24px 4px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; overflow-y: auto; }
+  .dlg-body .full { grid-column: 1 / -1; }
+  .dlg-foot { display: flex; gap: 10px; padding: 18px 24px 22px; align-items: center; }
+  .dlg-foot .spacer { flex: 1; }
+  .msg { font-size: 14px; color: var(--danger); min-height: 20px; margin: 4px 24px 0; }
+  #loginMsg { margin: 6px 0 0; }
+
+  /* Scheda cliente */
+  a.btn { display: inline-block; text-decoration: none; color: inherit; }
+  .back { margin-bottom: 16px; }
+  .c-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+  .c-head h2 { font-size: 26px; }
+  .c-head p { margin: 2px 0 0; color: var(--muted); }
+  .actions { display: flex; gap: 10px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 22px; }
+  .stat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 16px; }
+  .stat small { display: block; color: var(--muted); font-size: 13px; }
+  .stat b { font-size: 22px; font-weight: 650; }
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 26px; }
+  .chart-box { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px 10px; }
+  .chart-box h3, h3.sec { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
+  .chart-box .cv { position: relative; height: 210px; }
+  .row.m { grid-template-columns: 1.2fr repeat(4, 1fr); }
+  .row.head { cursor: default; color: var(--muted); font-size: 13px; padding-top: 10px; padding-bottom: 10px; background: #f1f5f3; }
+  .row.head:hover { background: #f1f5f3; }
+  .dlg-body.three { grid-template-columns: repeat(3, 1fr); }
+  .grp { font-weight: 600; margin-top: 6px; }
+  .preview { margin: 10px 24px 0; padding: 10px 12px; background: #f1f5f3; border-radius: var(--radius); font-size: 14px; }
+  .preview:empty { display: none; }
+
+  /* Calcolatore */
+  .calc { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 18px; align-items: start; }
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 6px 18px 18px; }
+  .panel > label { margin-top: 14px; }
+  .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .sl { margin-top: 16px; }
+  .sl .top { display: flex; justify-content: space-between; font-size: 14px; }
+  .sl label { margin: 0; }
+  input[type=range] { padding: 0; border: 0; accent-color: var(--accent); }
+  .kv { display: flex; justify-content: space-between; gap: 16px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
+  .kv span:first-child { color: var(--muted); flex: none; }
+  .kv span:last-child { text-align: right; }
+  .warn { background: #fff6e5; border: 1px solid #f0d9a8; border-radius: var(--radius); padding: 10px 12px; font-size: 14px; margin-top: 10px; }
+  .panel .stats { margin: 16px 0 6px; }
+  .row.d { grid-template-columns: 1.4fr 1fr 1fr 1.6fr; cursor: default; }
+  .row.d:hover { background: var(--surface); }
+  @media (max-width: 760px) {
+    .calc { grid-template-columns: 1fr; }
+    .row.d { grid-template-columns: 1.4fr 1fr 1fr; }
+    .row.d > :nth-child(4) { display: none; }
+  }
+  @media (max-width: 640px) {
+    .charts { grid-template-columns: 1fr; }
+    .row.m { grid-template-columns: 1.2fr 1fr 1fr; }
+    .row.m > :nth-child(n+4) { display: none; }
+    .dlg-body.three { grid-template-columns: 1fr 1fr; }
+  }
+
+  @media (max-width: 640px) {
+    .row { grid-template-columns: 1fr auto; }
+    .row .goal { display: none; }
+    .dlg-body { grid-template-columns: 1fr; }
+    .toolbar { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<section id="login" class="hidden">
+  <form class="login-box" id="loginForm">
+    <h1>Accedi</h1>
+    <p>Gestione diete dei clienti</p>
+    <div class="field"><label for="email">Email</label><input id="email" type="email" autocomplete="username" required></div>
+    <div class="field"><label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required></div>
+    <button class="btn primary" type="submit">Accedi</button>
+    <div class="msg" id="loginMsg" role="alert"></div>
+  </form>
+</section>
+
+<!-- APP -->
+<div id="app" class="hidden">
+  <header class="top"><div class="wrap">
+    <h1>Diete</h1>
+    <button class="btn" id="logoutBtn" type="button">Esci</button>
+  </div></header>
+
+  <main class="wrap">
+    <div id="viewList">
+    <div class="toolbar">
+      <input id="search" type="search" placeholder="Cerca un cliente per nome o cognome" aria-label="Cerca cliente">
+      <button class="btn primary" id="newBtn" type="button">Nuovo cliente</button>
+    </div>
+    <p class="count" id="count"></p>
+    <div class="list" id="list"></div>
+    </div>
+
+    <div id="viewClient" class="hidden">
+      <a class="btn back" href="#">Tutti i clienti</a>
+      <div class="c-head">
+        <div><h2 id="cName"></h2><p id="cMeta"></p></div>
+        <div class="actions">
+          <button class="btn" id="editBtn" type="button">Modifica scheda</button>
+          <button class="btn" id="newMeasBtn" type="button">Nuova misurazione</button>
+          <a class="btn primary" id="newDietBtn" href="#">Nuova dieta</a>
+        </div>
+      </div>
+      <p class="count" id="lastDate"></p>
+      <div class="stats" id="stats"></div>
+      <div class="charts">
+        <div class="chart-box"><h3>Peso (kg)</h3>
+          <div class="cv"><canvas id="chW"></canvas></div><div class="empty hidden" id="chW_e">Nessun dato</div></div>
+        <div class="chart-box"><h3>Grasso corporeo (%)</h3>
+          <div class="cv"><canvas id="chBF"></canvas></div><div class="empty hidden" id="chBF_e">Nessun dato</div></div>
+      </div>
+      <h3 class="sec">Storico misurazioni</h3>
+      <div class="list" id="measList"></div>
+      <h3 class="sec" style="margin-top:26px">Diete</h3>
+      <div class="list" id="dietList"></div>
+    </div>
+
+    <div id="viewCalc" class="hidden">
+      <a class="btn back" id="calcBack" href="#">Torna al cliente</a>
+      <div class="c-head">
+        <div><h2 id="calcTitle"></h2><p id="calcMeta"></p></div>
+        <div class="actions"><button class="btn primary" id="saveDietBtn" type="button">Salva dieta</button></div>
+      </div>
+      <div class="empty hidden" id="calcMiss"></div>
+      <div class="calc" id="calcBox">
+        <form class="panel" id="calcForm" onsubmit="return false">
+          <div class="g2">
+            <div><label for="k_peso">Peso (kg)</label><input id="k_peso" type="number" step="0.1" min="20" max="300"></div>
+            <div><label for="k_bf">Grasso (%)</label><input id="k_bf" type="number" step="0.1" min="2" max="70"></div>
+          </div>
+          <label for="k_att">Calorie che assume oggi (da anamnesi)</label>
+          <input id="k_att" type="number" step="10" min="0" placeholder="Lascia vuoto se non note">
+          <label for="k_attiv">Livello di attività</label><select id="k_attiv"></select>
+          <label for="k_mb">Formula del metabolismo basale</label><select id="k_mb"></select>
+          <label for="k_tdee">Formula del fabbisogno totale</label><select id="k_tdee"></select>
+          <label for="k_fase">Fase</label><select id="k_fase"></select>
+          <div id="k_sliders"></div>
+          <label for="k_note">Note sulla dieta</label><textarea id="k_note"></textarea>
+        </form>
+        <div class="panel" id="calcOut"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- FINESTRA CLIENTE -->
+<dialog id="dlg">
+  <form id="clientForm" method="dialog">
+    <div class="dlg-head"><h2 id="dlgTitle">Nuovo cliente</h2></div>
+    <div class="dlg-body">
+      <div><label for="f_nome">Nome</label><input id="f_nome" required></div>
+      <div><label for="f_cognome">Cognome</label><input id="f_cognome" required></div>
+      <div><label for="f_sesso">Sesso</label>
+        <select id="f_sesso"><option value="">Seleziona</option><option value="M">Uomo</option><option value="F">Donna</option></select></div>
+      <div><label for="f_data_nascita">Data di nascita</label><input id="f_data_nascita" type="date"></div>
+      <div><label for="f_altezza_cm">Altezza (cm)</label><input id="f_altezza_cm" type="number" step="0.1" min="100" max="250"></div>
+      <div><label for="f_telefono">Telefono</label><input id="f_telefono" type="tel"></div>
+      <div class="full"><label for="f_email">Email</label><input id="f_email" type="email"></div>
+      <div class="full"><label for="f_obiettivo">Obiettivo</label><input id="f_obiettivo" placeholder="Es. dimagrimento, massa, ricomposizione"></div>
+      <div class="full"><label for="f_anamnesi">Anamnesi</label><textarea id="f_anamnesi"></textarea></div>
+      <div><label for="f_allergie">Allergie</label><textarea id="f_allergie"></textarea></div>
+      <div><label for="f_intolleranze">Intolleranze</label><textarea id="f_intolleranze"></textarea></div>
+      <div class="full"><label for="f_note">Note</label><textarea id="f_note"></textarea></div>
+    </div>
+    <div class="msg" id="formMsg" role="alert"></div>
+    <div class="dlg-foot">
+      <button class="btn danger hidden" id="delBtn" type="button">Elimina cliente</button>
+      <span class="spacer"></span>
+      <button class="btn" id="cancelBtn" type="button">Annulla</button>
+      <button class="btn primary" type="submit">Salva cliente</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- FINESTRA MISURAZIONE -->
+<dialog id="measDlg">
+  <form id="measForm" method="dialog">
+    <div class="dlg-head"><h2 id="measTitle">Nuova misurazione</h2></div>
+    <div class="dlg-body three">
+      <div><label for="m_data">Data</label><input id="m_data" type="date" required></div>
+      <div><label for="m_peso">Peso (kg)</label><input id="m_peso" type="number" step="0.1" min="20" max="300" required></div>
+      <div class="grp full">Pliche</div>
+      <div><label id="lp0" for="m_p0"></label><input id="m_p0" type="number" step="0.1" min="0"></div>
+      <div><label id="lp1" for="m_p1"></label><input id="m_p1" type="number" step="0.1" min="0"></div>
+      <div><label id="lp2" for="m_p2"></label><input id="m_p2" type="number" step="0.1" min="0"></div>
+      <div class="full"><label for="m_bf">Oppure % di grasso inserita a mano (es. impedenziometria)</label><input id="m_bf" type="number" step="0.1" min="2" max="70"></div>
+      <div class="grp full">Circonferenze (cm)</div>
+      <div><label for="m_vita">Vita</label><input id="m_vita" type="number" step="0.1" min="0"></div>
+      <div><label for="m_fianchi">Fianchi</label><input id="m_fianchi" type="number" step="0.1" min="0"></div>
+      <div><label for="m_petto">Petto</label><input id="m_petto" type="number" step="0.1" min="0"></div>
+      <div><label for="m_braccio">Braccio</label><input id="m_braccio" type="number" step="0.1" min="0"></div>
+      <div><label for="m_coscia">Coscia</label><input id="m_coscia" type="number" step="0.1" min="0"></div>
+      <div class="full"><label for="m_note">Note</label><textarea id="m_note"></textarea></div>
+    </div>
+    <div class="preview" id="mPreview"></div>
+    <div class="msg" id="measMsg" role="alert"></div>
+    <div class="dlg-foot">
+      <button class="btn danger hidden" id="measDelBtn" type="button">Elimina</button>
+      <span class="spacer"></span>
+      <button class="btn" id="measCancelBtn" type="button">Annulla</button>
+      <button class="btn primary" type="submit">Salva misurazione</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+<script src="calc.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+const SUPABASE_URL = 'https://gwjipgrobvbowyeenncc.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3amlwZ3JvYnZib3d5ZWVubmNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0MzU0MDUsImV4cCI6MjEwOTAxMTQwNX0.tjsSholCb23T6guxEIJ4b7u37rKseBqI4AIPFJBbgBM';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const $ = id => document.getElementById(id);
+const FIELDS = ['nome','cognome','sesso','data_nascita','altezza_cm','telefono','email','obiettivo','anamnesi','allergie','intolleranze','note'];
+let clients = [];
+let editingId = null;
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function age(iso) {
+  if (!iso) return null;
+  const b = new Date(iso), n = new Date();
+  let a = n.getFullYear() - b.getFullYear();
+  if (n < new Date(n.getFullYear(), b.getMonth(), b.getDate())) a--;
+  return a;
+}
+
+/* ---------- Accesso ---------- */
+function show(loggedIn) {
+  $('login').classList.toggle('hidden', loggedIn);
+  $('app').classList.toggle('hidden', !loggedIn);
+}
+
+$('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  $('loginMsg').textContent = '';
+  const { error } = await db.auth.signInWithPassword({ email: $('email').value.trim(), password: $('password').value });
+  if (error) { $('loginMsg').textContent = 'Email o password non corrette.'; return; }
+  await start();
+});
+
+$('logoutBtn').addEventListener('click', async () => {
+  await db.auth.signOut();
+  clients = [];
+  location.hash = '';
+  show(false);
+});
+
+/* ---------- Elenco clienti ---------- */
+async function loadClients() {
+  const { data, error } = await db.from('clients').select('*').order('cognome').order('nome');
+  if (error) { $('list').innerHTML = '<div class="empty">Non riesco a caricare i clienti. Hai eseguito lo script schema.sql su Supabase?</div>'; return; }
+  clients = data;
+  render();
+  route();
+}
+
+function render() {
+  const q = $('search').value.trim().toLowerCase();
+  const rows = clients.filter(c => (c.cognome + ' ' + c.nome).toLowerCase().includes(q));
+  $('count').textContent = clients.length ? `${rows.length} di ${clients.length} clienti` : '';
+  if (!rows.length) {
+    $('list').innerHTML = `<div class="empty">${clients.length ? 'Nessun cliente corrisponde alla ricerca.' : 'Non ci sono ancora clienti. Aggiungi il primo con “Nuovo cliente”.'}</div>`;
+    return;
+  }
+  $('list').innerHTML = rows.map(c => {
+    const a = age(c.data_nascita);
+    const sub = [c.sesso === 'M' ? 'Uomo' : c.sesso === 'F' ? 'Donna' : '', a != null ? a + ' anni' : ''].filter(Boolean).join(', ');
+    return `<div class="row" tabindex="0" role="button" data-id="${esc(c.id)}">
+      <div class="name">${esc(c.cognome)} ${esc(c.nome)}</div>
+      <div class="sub">${esc(sub)}</div>
+      <div class="goal">${esc(c.obiettivo)}</div>
+      <div class="sub">${c.altezza_cm ? esc(c.altezza_cm) + ' cm' : ''}</div>
+    </div>`;
+  }).join('');
+}
+
+$('search').addEventListener('input', render);
+$('list').addEventListener('click', e => { const r = e.target.closest('.row'); if (r) location.hash = '#c=' + r.dataset.id; });
+$('list').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.classList.contains('row')) location.hash = '#c=' + e.target.dataset.id; });
+
+/* ---------- Scheda cliente (creazione e modifica) ---------- */
+function openForm(id) {
+  editingId = id || null;
+  const c = id ? clients.find(x => x.id === id) : {};
+  FIELDS.forEach(f => { $('f_' + f).value = c[f] ?? ''; });
+  $('dlgTitle').textContent = id ? `${c.nome} ${c.cognome}` : 'Nuovo cliente';
+  $('delBtn').classList.toggle('hidden', !id);
+  $('formMsg').textContent = '';
+  $('dlg').showModal();
+}
+
+$('newBtn').addEventListener('click', () => openForm(null));
+$('cancelBtn').addEventListener('click', () => $('dlg').close());
+
+$('clientForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const payload = {};
+  FIELDS.forEach(f => {
+    const v = $('f_' + f).value.trim();
+    payload[f] = v === '' ? null : (f === 'altezza_cm' ? Number(v) : v);
+  });
+  const res = editingId
+    ? await db.from('clients').update(payload).eq('id', editingId)
+    : await db.from('clients').insert(payload);
+  if (res.error) { $('formMsg').textContent = 'Salvataggio non riuscito: ' + res.error.message; return; }
+  $('dlg').close();
+  await loadClients();
+});
+
+$('delBtn').addEventListener('click', async () => {
+  const c = clients.find(x => x.id === editingId);
+  if (!confirm(`Eliminare ${c.nome} ${c.cognome}? Verranno eliminati anche misurazioni e diete collegate.`)) return;
+  const { error } = await db.from('clients').delete().eq('id', editingId);
+  if (error) { $('formMsg').textContent = 'Eliminazione non riuscita: ' + error.message; return; }
+  location.hash = '';
+  $('dlg').close();
+  await loadClients();
+});
+
+/* ---------- Scheda cliente e misurazioni ---------- */
+const PLICHE = {
+  M: [['petto', 'Petto'], ['addome', 'Addome'], ['coscia', 'Coscia']],
+  F: [['tricipite', 'Tricipite'], ['soprailiaca', 'Soprailiaca'], ['coscia', 'Coscia']]
+};
+const MISURE = ['vita', 'fianchi', 'petto', 'braccio', 'coscia'];
+let current = null, measurements = [], diets = [], editingMeas = null, charts = [];
+
+const num = v => (v === '' || v == null || isNaN(Number(v))) ? null : Number(v);
+const fmt = (v, d = 1) => v == null ? '-' : Number(v).toLocaleString('it-IT', { maximumFractionDigits: d });
+const fmtDate = iso => new Date(iso + 'T00:00:00').toLocaleDateString('it-IT');
+
+function ageAt(birth, on) {
+  if (!birth) return null;
+  const b = new Date(birth), n = new Date(on || new Date().toISOString().slice(0, 10));
+  let a = n.getUTCFullYear() - b.getUTCFullYear();
+  if (n.getUTCMonth() < b.getUTCMonth() || (n.getUTCMonth() === b.getUTCMonth() && n.getUTCDate() < b.getUTCDate())) a--;
+  return a;
+}
+
+// Jackson & Pollock a 3 pliche (S = somma in mm) + formula di Siri
+function bfFromSkinfolds(sesso, eta, S) {
+  const d = sesso === 'M'
+    ? 1.10938 - (8.267 * S) / 10000 + (1.6 * S * S) / 1000000 - (2.574 * eta) / 10000
+    : 1.0994921 - (9.929 * S) / 10000 + (2.3 * S * S) / 1000000 - (1.392 * eta) / 10000;
+  return 495 / d - 450;
+}
+
+function compute(m) {
+  const fm = m.peso_kg != null && m.bf_percent != null ? m.peso_kg * m.bf_percent / 100 : null;
+  return { fm, lbm: fm != null ? m.peso_kg - fm : null };
+}
+
+async function route() {
+  const m = location.hash.match(/^#c=([^/]+)(\/calc)?$/);
+  const c = m && clients.find(x => x.id === m[1]);
+  const calc = !!(c && m[2]);
+  $('viewList').classList.toggle('hidden', !!c);
+  $('viewClient').classList.toggle('hidden', !c || calc);
+  $('viewCalc').classList.toggle('hidden', !calc);
+  if (!c) { current = null; return; }
+  await showClient(c);
+  if (calc && current === c) initCalc();
+}
+window.addEventListener('hashchange', route);
+
+async function showClient(c) {
+  current = c;
+  $('cName').textContent = `${c.nome} ${c.cognome}`;
+  const a = ageAt(c.data_nascita);
+  $('cMeta').textContent = [c.sesso === 'M' ? 'Uomo' : c.sesso === 'F' ? 'Donna' : '', a != null ? a + ' anni' : '', c.altezza_cm ? c.altezza_cm + ' cm' : '', c.obiettivo].filter(Boolean).join(', ');
+  $('newDietBtn').href = '#c=' + c.id + '/calc';
+  const [ms, ds] = await Promise.all([
+    db.from('measurements').select('*').eq('client_id', c.id).order('data'),
+    db.from('diets').select('*').eq('client_id', c.id).order('versione', { ascending: false })
+  ]);
+  if (current !== c) return;
+  measurements = ms.error ? [] : ms.data;
+  diets = ds.error ? [] : ds.data;
+  renderMeasurements();
+  renderDiets();
+}
+
+function renderDiets() {
+  $('dietList').innerHTML = diets.length
+    ? '<div class="row d head"><div>Dieta</div><div>Data</div><div>Kcal</div><div>Proteine, carboidrati, grassi</div></div>'
+      + diets.map(d => { const r = d.risultati || {}; return `<div class="row d">
+          <div>${esc(d.titolo)}</div><div>${fmtDate(d.data)}</div><div>${fmt(r.kcal, 0)}</div>
+          <div>${fmt(r.pro, 0)} g, ${fmt(r.carb, 0)} g, ${fmt(r.fat, 0)} g</div></div>`; }).join('')
+    : '<div class="empty">Non ci sono diete. Crea la prima con “Nuova dieta”.</div>';
+}
+
+function makeChart(id, pts, get, unit) {
+  $(id).parentElement.classList.toggle('hidden', !pts.length);
+  $(id + '_e').classList.toggle('hidden', !!pts.length);
+  if (!pts.length || typeof Chart === 'undefined') return;
+  charts.push(new Chart($(id), {
+    type: 'line',
+    data: { labels: pts.map(p => fmtDate(p.data)), datasets: [{ data: pts.map(get), borderColor: '#1f6f5c', backgroundColor: '#1f6f5c', tension: .25, pointRadius: 4 }] },
+    options: {
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => fmt(c.parsed.y) + ' ' + unit } } },
+      scales: { y: { ticks: { callback: v => fmt(v) } } }
+    }
+  }));
+}
+
+function renderMeasurements() {
+  const rows = measurements.map(m => ({ ...m, ...compute(m) }));
+  const last = rows[rows.length - 1];
+  const h = current.altezza_cm ? current.altezza_cm / 100 : null;
+  const bmi = last && last.peso_kg && h ? last.peso_kg / (h * h) : null;
+
+  $('lastDate').textContent = last ? 'Ultima misurazione: ' + fmtDate(last.data) : '';
+  $('stats').innerHTML = last ? [
+    ['Peso (kg)', last.peso_kg], ['Grasso (%)', last.bf_percent],
+    ['Massa magra (kg)', last.lbm], ['Massa grassa (kg)', last.fm], ['BMI', bmi]
+  ].map(([l, v]) => `<div class="stat"><small>${l}</small><b>${fmt(v)}</b></div>`).join('') : '';
+
+  charts.forEach(ch => ch.destroy());
+  charts = [];
+  makeChart('chW', rows.filter(r => r.peso_kg != null), r => r.peso_kg, 'kg');
+  makeChart('chBF', rows.filter(r => r.bf_percent != null), r => r.bf_percent, '%');
+
+  $('measList').innerHTML = rows.length
+    ? '<div class="row m head"><div>Data</div><div>Peso</div><div>Grasso</div><div>Massa magra</div><div>Massa grassa</div></div>'
+      + rows.slice().reverse().map(r => `<div class="row m" tabindex="0" role="button" data-id="${esc(r.id)}">
+          <div>${fmtDate(r.data)}</div><div>${fmt(r.peso_kg)} kg</div>
+          <div>${r.bf_percent != null ? fmt(r.bf_percent) + ' %' : '-'}</div>
+          <div>${r.lbm != null ? fmt(r.lbm) + ' kg' : '-'}</div>
+          <div>${r.fm != null ? fmt(r.fm) + ' kg' : '-'}</div></div>`).join('')
+    : '<div class="empty">Non ci sono misurazioni. Aggiungi la prima con “Nuova misurazione”.</div>';
+}
+
+$('editBtn').addEventListener('click', () => openForm(current.id));
+$('newMeasBtn').addEventListener('click', () => openMeas(null));
+$('measList').addEventListener('click', e => { const r = e.target.closest('.row.m:not(.head)'); if (r) openMeas(r.dataset.id); });
+$('measList').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset.id) openMeas(e.target.dataset.id); });
+$('measCancelBtn').addEventListener('click', () => $('measDlg').close());
+
+function openMeas(id) {
+  editingMeas = id;
+  const m = id ? measurements.find(x => x.id === id) : {};
+  const names = PLICHE[current.sesso] || [['p1', 'Plica 1'], ['p2', 'Plica 2'], ['p3', 'Plica 3']];
+  $('m_data').value = m.data || new Date().toISOString().slice(0, 10);
+  $('m_peso').value = m.peso_kg ?? '';
+  names.forEach(([k, l], i) => { $('lp' + i).textContent = l + ' (mm)'; $('m_p' + i).value = m.pliche?.[k] ?? ''; });
+  $('m_bf').value = m.pliche ? '' : (m.bf_percent ?? '');
+  MISURE.forEach(k => { $('m_' + k).value = m.misure?.[k] ?? ''; });
+  $('m_note').value = m.note ?? '';
+  $('measTitle').textContent = id ? 'Modifica misurazione' : 'Nuova misurazione';
+  $('measDelBtn').classList.toggle('hidden', !id);
+  $('measMsg').textContent = '';
+  updatePreview();
+  $('measDlg').showModal();
+}
+
+// Legge il modulo e calcola il % di grasso (dalle pliche se sono tutte e tre, altrimenti il valore a mano)
+function readMeas() {
+  const names = PLICHE[current.sesso];
+  const peso = num($('m_peso').value);
+  const vals = [0, 1, 2].map(i => num($('m_p' + i).value));
+  const full = vals.every(v => v != null);
+  const eta = ageAt(current.data_nascita, $('m_data').value);
+  let bf = null, pliche = null, note = '';
+  if (full && names && eta != null) {
+    bf = Math.round(bfFromSkinfolds(current.sesso, eta, vals[0] + vals[1] + vals[2]) * 10) / 10;
+    pliche = Object.fromEntries(names.map(([k], i) => [k, vals[i]]));
+  } else {
+    bf = num($('m_bf').value);
+    if (full) note = 'Per calcolare il % di grasso dalle pliche servono sesso e data di nascita nella scheda del cliente.';
+    else if (vals.some(v => v != null)) note = 'Inserisci tutte e tre le pliche per calcolare il % di grasso.';
+  }
+  return { peso, bf, pliche, note };
+}
+
+function updatePreview() {
+  const r = readMeas();
+  const c = compute({ peso_kg: r.peso, bf_percent: r.bf });
+  const parts = [];
+  if (r.bf != null) {
+    parts.push('Grasso ' + fmt(r.bf) + ' %');
+    if (c.fm != null) parts.push('massa grassa ' + fmt(c.fm) + ' kg', 'massa magra ' + fmt(c.lbm) + ' kg');
+  }
+  $('mPreview').textContent = [parts.join(', '), r.note].filter(Boolean).join('. ');
+}
+$('measForm').addEventListener('input', updatePreview);
+
+$('measForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const r = readMeas();
+  const misure = Object.fromEntries(MISURE.map(k => [k, num($('m_' + k).value)]).filter(([, v]) => v != null));
+  const payload = {
+    client_id: current.id, data: $('m_data').value, peso_kg: r.peso, bf_percent: r.bf, pliche: r.pliche,
+    misure: Object.keys(misure).length ? misure : null, note: $('m_note').value.trim() || null
+  };
+  const res = editingMeas
+    ? await db.from('measurements').update(payload).eq('id', editingMeas)
+    : await db.from('measurements').insert(payload);
+  if (res.error) { $('measMsg').textContent = 'Salvataggio non riuscito: ' + res.error.message; return; }
+  $('measDlg').close();
+  await showClient(current);
+});
+
+$('measDelBtn').addEventListener('click', async () => {
+  if (!confirm('Eliminare questa misurazione?')) return;
+  const { error } = await db.from('measurements').delete().eq('id', editingMeas);
+  if (error) { $('measMsg').textContent = 'Eliminazione non riuscita: ' + error.message; return; }
+  $('measDlg').close();
+  await showClient(current);
+});
+
+/* ---------- Calcolatore ---------- */
+let K = { fase: 'cut', v: {} }, OUT = null;
+const row = (a, b) => `<div class="kv"><span>${a}</span><span>${b}</span></div>`;
+
+(function fillSelects() {
+  const opt = o => Object.entries(o).map(([k, x]) => `<option value="${k}">${esc(x.nome)}</option>`).join('');
+  $('k_attiv').innerHTML = opt(Calc.ATT);
+  $('k_mb').innerHTML = opt(Calc.BMR);
+  $('k_tdee').innerHTML = opt(Calc.TDEE);
+  $('k_fase').innerHTML = opt(Calc.FASI);
+})();
+
+function initCalc() {
+  const c = current, eta = ageAt(c.data_nascita);
+  const miss = [!c.sesso && 'sesso', eta == null && 'data di nascita', !c.altezza_cm && 'altezza'].filter(Boolean);
+  $('calcBack').href = '#c=' + c.id;
+  $('calcTitle').textContent = `Nuova dieta: ${c.nome} ${c.cognome}`;
+  $('calcMeta').textContent = $('cMeta').textContent;
+  $('calcMiss').textContent = `Per calcolare servono ${miss.join(', ')} nella scheda del cliente.`;
+  $('calcMiss').classList.toggle('hidden', !miss.length);
+  $('calcBox').classList.toggle('hidden', !!miss.length);
+  $('saveDietBtn').classList.toggle('hidden', !!miss.length);
+  if (miss.length) return;
+
+  const last = measurements[measurements.length - 1], prev = diets[0]?.parametri || {};
+  $('k_peso').value = last?.peso_kg ?? '';
+  $('k_bf').value = last?.bf_percent ?? '';
+  $('k_att').value = prev.kcalAtt ?? '';
+  $('k_attiv').value = prev.att || 'mod';
+  $('k_mb').value = prev.mb || 'mifflin';
+  $('k_tdee').value = prev.tdee || 'mcdonald';
+  $('k_note').value = '';
+  const soglia = c.sesso === 'M' ? 31 : 28;
+  K.fase = (prev.kcalAtt && last?.peso_kg && prev.kcalAtt / last.peso_kg < soglia) ? 'reset' : 'cut';
+  $('k_fase').value = K.fase;
+  setSliders();
+}
+
+function setSliders() {
+  const spec = Calc.sliders(K.fase, current.sesso);
+  K.v = Object.fromEntries(spec.map(s => [s[0], s[5]]));
+  $('k_sliders').innerHTML = spec.map(([k, l, u, mn, mx, df, st]) =>
+    `<div class="sl"><div class="top"><label for="s_${k}">${l}</label><b id="sv_${k}">${fmt(df, 2)} ${u}</b></div>
+     <input type="range" id="s_${k}" data-k="${k}" data-u="${u}" min="${mn}" max="${mx}" step="${st}" value="${df}"></div>`).join('');
+  recalc();
+}
+
+$('calcForm').addEventListener('input', e => {
+  if (e.target.type === 'range') {
+    const k = e.target.dataset.k;
+    K.v[k] = Number(e.target.value);
+    $('sv_' + k).textContent = fmt(K.v[k], 2) + ' ' + e.target.dataset.u;
+    recalc();
+  } else if (e.target.id === 'k_fase') { K.fase = e.target.value; setSliders(); }
+  else recalc();
+});
+
+function readCalc() {
+  const c = current;
+  return { sesso: c.sesso, eta: ageAt(c.data_nascita), altezza: c.altezza_cm, peso: num($('k_peso').value), bf: num($('k_bf').value),
+    kcalAtt: num($('k_att').value), att: $('k_attiv').value, mb: $('k_mb').value, tdee: $('k_tdee').value };
+}
+
+function recalc() {
+  const p = readCalc();
+  if (!p.peso) { OUT = null; $('calcOut').innerHTML = '<div class="empty">Inserisci il peso del cliente per vedere il calcolo.</div>'; return; }
+  const o = OUT = Calc.calcola(p, K.fase, K.v);
+  const bmr = Object.entries(o.mbAll).map(([k, v]) => `${Calc.BMR[k].corto} ${fmt(v, 0)}`).join(', ');
+  const q = o.quota;
+  $('calcOut').innerHTML = `
+    <div class="stats">
+      <div class="stat"><small>Kcal al giorno</small><b>${fmt(o.kcal, 0)}</b></div>
+      <div class="stat"><small>Proteine</small><b>${fmt(o.pro, 0)} g</b></div>
+      <div class="stat"><small>Carboidrati</small><b>${fmt(o.carb, 0)} g</b></div>
+      <div class="stat"><small>Grassi</small><b>${fmt(o.fat, 0)} g</b></div>
+    </div>
+    ${row('Quota delle calorie', `proteine ${q.pro}%, carboidrati ${q.carb}%, grassi ${q.fat}%`)}
+    ${row('Metabolismo basale', fmt(o.mb, 0) + ' kcal')}
+    ${row('Confronto formule', bmr)}
+    ${row('Fabbisogno totale', fmt(o.tdee, 0) + ' kcal')}
+    ${row('Check metabolico', o.check)}
+    ${o.reset ? row('Piano del reset', `+${fmt(o.reset.diff, 0)} kcal in circa ${o.reset.settimane[0]}-${o.reset.settimane[1]} settimane (+40-60 kcal ogni 7-14 giorni)`) : ''}
+    ${o.ritmo ? row('Ritmo stimato', `${fmt(o.ritmo.kg, 2)} kg a settimana (${fmt(o.ritmo.pct, 2)}% del peso)`) : ''}
+    ${row('Acqua', o.acqua.min === o.acqua.max ? `${fmt(o.acqua.min, 1)} L, oppure ${fmt(o.acqua.f2, 1)} L con la seconda formula`
+        : `${fmt(o.acqua.min, 1)}-${fmt(o.acqua.max, 1)} L, oppure ${fmt(o.acqua.f2, 1)} L con la seconda formula`)}
+    ${row('Fibre', `${o.fibre.min}-${o.fibre.max} g (suggerite ${o.fibre.sug} g)`)}
+    ${o.avvisi.map(a => `<div class="warn">${esc(a)}</div>`).join('')}`;
+}
+
+$('saveDietBtn').addEventListener('click', async () => {
+  if (!OUT) { alert('Inserisci il peso del cliente.'); return; }
+  const btn = $('saveDietBtn');
+  btn.disabled = true;
+  const { data: prev } = await db.from('diets').select('versione').eq('client_id', current.id).order('versione', { ascending: false }).limit(1);
+  const versione = (prev?.[0]?.versione || 0) + 1;
+  const p = readCalc();
+  const { error } = await db.from('diets').insert({
+    client_id: current.id, versione,
+    titolo: `Dieta ${versione}: ${Calc.FASI[K.fase].nome}`,
+    data: new Date().toISOString().slice(0, 10),
+    parametri: { ...p, fase: K.fase, slider: K.v },
+    risultati: OUT, note: $('k_note').value.trim() || null
+  });
+  btn.disabled = false;
+  if (error) { alert('Salvataggio non riuscito: ' + error.message); return; }
+  location.hash = '#c=' + current.id;
+});
+
+/* ---------- Avvio ---------- */
+async function start() {
+  show(true);
+  await loadClients();
+}
+
+(async () => {
+  const { data } = await db.auth.getSession();
+  if (data.session) await start(); else show(false);
+})();
+</script>
+</body>
+</html>
