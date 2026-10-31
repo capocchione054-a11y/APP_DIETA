@@ -105,8 +105,8 @@
   .kv span:last-child { text-align: right; }
   .warn { background: #fff6e5; border: 1px solid #f0d9a8; border-radius: var(--radius); padding: 10px 12px; font-size: 14px; margin-top: 10px; }
   .panel .stats { margin: 16px 0 6px; }
-  .row.d { grid-template-columns: 1.4fr 1fr 1fr 1.6fr; cursor: default; }
-  .row.d:hover { background: var(--surface); }
+  .row.d { grid-template-columns: 1.4fr 1fr 1fr 1.6fr; }
+  .row.d.head { cursor: default; }
   .days { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px; }
   .days label { font-size: 13px; margin: 0 0 2px; }
   .days select { padding: 6px 4px; font-size: 14px; }
@@ -121,6 +121,27 @@
   .row.w { grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr 1fr; cursor: default; }
   .row.p { grid-template-columns: 1.2fr 1fr 1.3fr 1.6fr; cursor: default; }
   .row.w:not(.head):hover, .row.p:not(.head):hover { background: var(--surface); }
+  .nav { display: flex; gap: 8px; }
+  .meal { margin-top: 14px; padding-top: 14px; }
+  .meal-h { display: grid; grid-template-columns: 1fr 110px auto; gap: 10px; align-items: end; }
+  .ptr { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .ptr-h { display: flex; justify-content: space-between; align-items: center; }
+  .lnk { background: none; border: 0; color: var(--muted); cursor: pointer; text-decoration: underline; padding: 4px; font-size: 14px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; background: #eaf2ee; border-radius: 999px; padding: 4px 6px 4px 12px; font-size: 14px; }
+  .chip i { font-style: normal; color: var(--accent); font-weight: 600; }
+  .chip button { border: 0; background: none; cursor: pointer; font-size: 16px; line-height: 1; padding: 2px 6px; color: var(--muted); }
+  .addrow { display: grid; grid-template-columns: 1fr 150px auto; gap: 8px; }
+  .addp { display: flex; gap: 8px; margin-top: 16px; max-width: 380px; }
+  .row.f { grid-template-columns: 2.6fr 1fr 1.2fr; }
+  @media (max-width: 760px) {
+    .meal-h { grid-template-columns: 1fr 90px; }
+    .meal-h .btn { grid-column: 1 / -1; }
+    .addrow { grid-template-columns: 1fr 1fr; }
+    .addrow input { grid-column: 1 / -1; }
+    .row.f { grid-template-columns: 1fr 1fr; }
+    .row.f > :nth-child(3) { display: none; }
+  }
   @media (max-width: 760px) {
     .row.w { grid-template-columns: 1fr 1fr 1fr; }
     .row.w > :nth-child(n+4) { display: none; }
@@ -166,7 +187,7 @@
 <div id="app" class="hidden">
   <header class="top"><div class="wrap">
     <h1>Diete</h1>
-    <button class="btn" id="logoutBtn" type="button">Esci</button>
+    <nav class="nav"><a class="btn" href="#">Clienti</a><a class="btn" href="#alimenti">Alimenti</a><button class="btn" id="logoutBtn" type="button">Esci</button></nav>
   </div></header>
 
   <main class="wrap">
@@ -242,6 +263,40 @@
         <button class="btn" id="tlAdd" type="button" style="margin-top:14px">Aggiungi fase</button>
       </div>
     </div>
+
+    <div id="viewFoods" class="hidden">
+      <div class="c-head">
+        <div><h2>Alimenti</h2><p>Libreria delle opzioni tra cui scegliere nei pasti</p></div>
+        <div class="actions">
+          <button class="btn" id="foodExBtn" type="button">Carica lista d’esempio</button>
+          <button class="btn" id="foodImportBtn" type="button">Importa CSV</button>
+          <input type="file" id="foodFile" accept=".csv,text/csv" class="hidden">
+          <button class="btn primary" id="foodNewBtn" type="button">Nuovo alimento</button>
+        </div>
+      </div>
+      <div class="toolbar">
+        <input id="foodSearch" type="search" placeholder="Cerca un alimento" aria-label="Cerca alimento">
+        <select id="foodCat" aria-label="Categoria"></select>
+      </div>
+      <p class="count" id="foodCount"></p>
+      <div class="list" id="foodList"></div>
+    </div>
+
+    <div id="viewDiet" class="hidden">
+      <a class="btn back" id="dietBack" href="#">Torna al cliente</a>
+      <div class="c-head">
+        <div><h2 id="dietTitle"></h2><p id="dietMeta"></p></div>
+        <div class="actions">
+          <button class="btn danger" id="dietDelBtn" type="button">Elimina dieta</button>
+          <button class="btn primary" id="mealSaveBtn" type="button">Salva pasti</button>
+        </div>
+      </div>
+      <p class="count" id="mealMsg"></p>
+      <div class="warn hidden" id="pctWarn"></div>
+      <div id="mealsBox"></div>
+      <button class="btn" id="addMealBtn" type="button" style="margin-top:16px">Aggiungi pasto</button>
+      <div id="dlists"></div>
+    </div>
   </main>
 </div>
 
@@ -307,6 +362,26 @@
   </form>
 </dialog>
 
+<!-- FINESTRA ALIMENTO -->
+<dialog id="foodDlg">
+  <form id="foodForm" method="dialog">
+    <div class="dlg-head"><h2 id="foodTitle">Nuovo alimento</h2></div>
+    <div class="dlg-body">
+      <div class="full"><label for="fo_nome">Alimento o opzione (con la quantità, se vuoi)</label><textarea id="fo_nome" required></textarea></div>
+      <div><label for="fo_cat">Categoria (portata)</label><select id="fo_cat"></select></div>
+      <div><label for="fo_regola">Regola (facoltativa)</label><input id="fo_regola" placeholder="Es. max 1 a settimana"></div>
+    </div>
+    <div class="msg" id="foodMsg" role="alert"></div>
+    <div class="dlg-foot">
+      <button class="btn danger hidden" id="foodDelBtn" type="button">Elimina</button>
+      <span class="spacer"></span>
+      <button class="btn" id="foodCancelBtn" type="button">Annulla</button>
+      <button class="btn primary" type="submit">Salva</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
 <script src="calc.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
@@ -457,15 +532,14 @@ function compute(m) {
 }
 
 async function route() {
-  const m = location.hash.match(/^#c=([^/]+)(\/calc)?$/);
+  if (location.hash === '#alimenti') { current = null; setView('viewFoods'); loadFoods(); return; }
+  const m = location.hash.match(/^#c=([^/]+)(?:\/(calc)|\/d=([^/]+))?$/);
   const c = m && clients.find(x => x.id === m[1]);
-  const calc = !!(c && m[2]);
-  $('viewList').classList.toggle('hidden', !!c);
-  $('viewClient').classList.toggle('hidden', !c || calc);
-  $('viewCalc').classList.toggle('hidden', !calc);
-  if (!c) { current = null; return; }
+  if (!c) { current = null; setView('viewList'); return; }
+  setView(m[2] ? 'viewCalc' : m[3] ? 'viewDiet' : 'viewClient');
   await showClient(c);
-  if (calc && current === c) initCalc();
+  if (current !== c) return;
+  if (m[2]) initCalc(); else if (m[3]) openDiet(m[3]);
 }
 window.addEventListener('hashchange', route);
 
@@ -498,7 +572,7 @@ async function showClient(c) {
 function renderDiets() {
   $('dietList').innerHTML = diets.length
     ? '<div class="row d head"><div>Dieta</div><div>Data</div><div>Kcal</div><div>Proteine, carboidrati, grassi</div></div>'
-      + diets.map(d => { const r = d.risultati || {}; return `<div class="row d">
+      + diets.map(d => { const r = d.risultati || {}; return `<div class="row d" tabindex="0" role="button" data-id="${esc(d.id)}">
           <div>${esc(d.titolo)}</div><div>${fmtDate(d.data)}</div><div>${fmt(r.kcal, 0)}</div>
           <div>${fmt(r.pro, 0)} g, ${fmt(r.carb, 0)} g, ${fmt(r.fat, 0)} g</div></div>`; }).join('')
     : '<div class="empty">Non ci sono diete. Crea la prima con “Nuova dieta”.</div>';
@@ -871,6 +945,250 @@ $('saveDietBtn').addEventListener('click', async () => {
   }
   location.hash = '#c=' + current.id;
 });
+
+/* ---------- Alimenti e pasti ---------- */
+const CATS = ['Primo', 'Secondo', 'Contorno', 'Pane', 'Frutta', 'Carboidrato', 'Bevanda', 'Spuntino', 'Pre-allenamento', 'Cena libera'];
+const GGS = GG.map(g => g.slice(0, 3));
+const VIEWS = ['viewList', 'viewClient', 'viewCalc', 'viewFoods', 'viewDiet'];
+function setView(v) { VIEWS.forEach(x => $(x).classList.toggle('hidden', x !== v)); }
+
+// Lista d'esempio: categoria|alimento|regola (facoltativa)
+const ESEMPIO = [
+  'Bevanda|Latte parzialmente scremato 200 ml', 'Bevanda|Bevanda di soia senza zuccheri 200 ml', 'Bevanda|Spremuta d’arancia 200 ml', 'Bevanda|Caffè o tè senza zucchero',
+  'Carboidrato|4 fette biscottate con 20 g di marmellata', 'Carboidrato|Fiocchi d’avena 40 g con yogurt bianco 125 g', 'Carboidrato|Biscotti secchi 40 g', 'Carboidrato|Pane integrale 50 g con 30 g di marmellata', 'Carboidrato|Cereali integrali 40 g',
+  'Spuntino|Un frutto di stagione come spuntino', 'Spuntino|Yogurt greco bianco 150 g', 'Spuntino|Frutta secca sgusciata 20 g', 'Spuntino|2 gallette di riso', 'Spuntino|1 barretta di cereali', 'Spuntino|Cracker integrali 30 g',
+  'Pre-allenamento|Pane integrale 50 g con 50 g di affettato magro', 'Pre-allenamento|Gallette 40 g con 20 g di marmellata',
+  'Primo|Pasta 80 g con pomodoro', 'Primo|Riso basmati 80 g con verdure', 'Primo|Pasta integrale 80 g con legumi', 'Primo|Gnocchi di patate 200 g', 'Primo|Orzo 80 g in minestrone di verdure', 'Primo|Couscous 80 g con verdure',
+  'Secondo|Petto di pollo 150 g', 'Secondo|Petto di tacchino 150 g', 'Secondo|Merluzzo o platessa 200 g', 'Secondo|Salmone 130 g', 'Secondo|Tonno al naturale 100 g', 'Secondo|2 uova con 2 albumi', 'Secondo|Bresaola 80 g', 'Secondo|Manzo magro 150 g', 'Secondo|Legumi cotti 200 g',
+  'Secondo|Mozzarella 100 g|max 1 a settimana', 'Secondo|Ricotta 130 g|max 1 a settimana',
+  'Contorno|Verdure cotte 200 g', 'Contorno|Insalata mista', 'Contorno|Verdure grigliate 200 g', 'Contorno|Finocchi e carote crude',
+  'Pane|Pane integrale 60 g', 'Pane|2 fette di pane tostato', 'Pane|4 gallette di mais', 'Pane|Fresella integrale 30 g',
+  'Frutta|Frutta fresca di stagione 150 g', 'Frutta|Banana 100 g', 'Frutta|1 mela o 1 pera', 'Frutta|Mandarini o arance 200 g', 'Frutta|Anguria 250 g',
+  'Cena libera|Pizza tonda con un secondo e un contorno|max 1 a settimana', 'Cena libera|Panino con hamburger e insalata|max 1 a settimana'
+];
+
+let foods = [], foodsLoaded = false, editingFood = null, M = null;
+$('foodCat').innerHTML = '<option value="">Tutte le categorie</option>' + CATS.map(c => `<option>${c}</option>`).join('');
+$('fo_cat').innerHTML = '<option value="">Nessuna</option>' + CATS.map(c => `<option>${c}</option>`).join('');
+
+/* --- Libreria --- */
+async function loadFoods() {
+  const { data, error } = await db.from('foods').select('*').order('categoria').order('nome');
+  if (!error) { foods = data; foodsLoaded = true; }
+  renderFoods();
+}
+const ensureFoods = async () => { if (!foodsLoaded) await loadFoods(); };
+
+function renderFoods() {
+  const q = $('foodSearch').value.trim().toLowerCase(), cat = $('foodCat').value;
+  const rows = foods.filter(f => (!cat || f.categoria === cat) && f.nome.toLowerCase().includes(q));
+  $('foodCount').textContent = foods.length ? `${rows.length} di ${foods.length} alimenti` : '';
+  $('foodList').innerHTML = rows.length
+    ? rows.map(f => `<div class="row f" tabindex="0" role="button" data-id="${esc(f.id)}"><div>${esc(f.nome)}</div><div class="sub">${esc(f.categoria)}</div><div class="sub">${esc(f.regola)}</div></div>`).join('')
+    : `<div class="empty">${foods.length ? 'Nessun alimento corrisponde alla ricerca.' : 'La libreria è vuota. Importa un CSV o carica la lista d’esempio.'}</div>`;
+}
+$('foodSearch').addEventListener('input', renderFoods);
+$('foodCat').addEventListener('input', renderFoods);
+$('foodList').addEventListener('click', e => { const r = e.target.closest('.row'); if (r) openFood(r.dataset.id); });
+$('foodList').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset.id) openFood(e.target.dataset.id); });
+$('foodNewBtn').addEventListener('click', () => openFood(null));
+$('foodCancelBtn').addEventListener('click', () => $('foodDlg').close());
+
+function openFood(id) {
+  editingFood = id || null;
+  const f = id ? foods.find(x => x.id === id) : {};
+  $('fo_nome').value = f.nome || ''; $('fo_cat').value = f.categoria || ''; $('fo_regola').value = f.regola || '';
+  $('foodTitle').textContent = id ? 'Modifica alimento' : 'Nuovo alimento';
+  $('foodDelBtn').classList.toggle('hidden', !id);
+  $('foodMsg').textContent = '';
+  $('foodDlg').showModal();
+}
+$('foodForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const p = { nome: $('fo_nome').value.trim(), categoria: $('fo_cat').value || null, regola: $('fo_regola').value.trim() || null };
+  const res = editingFood ? await db.from('foods').update(p).eq('id', editingFood) : await db.from('foods').insert(p);
+  if (res.error) { $('foodMsg').textContent = res.error.code === '23505' ? 'Esiste già un alimento con questo nome.' : 'Salvataggio non riuscito: ' + res.error.message; return; }
+  $('foodDlg').close(); await loadFoods();
+});
+$('foodDelBtn').addEventListener('click', async () => {
+  if (!confirm('Eliminare questo alimento dalla libreria? Le diete già salvate lo conservano.')) return;
+  const { error } = await db.from('foods').delete().eq('id', editingFood);
+  if (error) { $('foodMsg').textContent = 'Eliminazione non riuscita: ' + error.message; return; }
+  $('foodDlg').close(); await loadFoods();
+});
+
+/* --- Import --- */
+function normPortata(s) {
+  s = String(s || '').toLowerCase().trim();
+  if (s.startsWith('cena libera')) return 'Cena libera';
+  if (s.includes('pre-allenamento')) return 'Pre-allenamento';
+  const base = s.replace(/\(.*\)/, '').trim();
+  return CATS.find(c => c.toLowerCase() === base) || null;
+}
+
+async function addFoods(list) {
+  const seen = new Set(foods.map(f => f.nome.toLowerCase()));
+  const nuovi = [];
+  for (const f of list) {
+    const nome = String(f.nome || '').trim(), k = nome.toLowerCase();
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    nuovi.push({ nome, categoria: f.categoria || null, regola: f.regola || null });
+  }
+  for (let i = 0; i < nuovi.length; i += 100) {
+    const { error } = await db.from('foods').insert(nuovi.slice(i, i + 100));
+    if (error) { alert('Importazione non riuscita: ' + error.message); break; }
+  }
+  await loadFoods();
+  alert(`Aggiunti ${nuovi.length} alimenti. Ignorati ${list.length - nuovi.length} (già presenti o vuoti).`);
+}
+
+$('foodExBtn').addEventListener('click', () => addFoods(ESEMPIO.map(s => { const [categoria, nome, regola] = s.split('|'); return { categoria, nome, regola }; })));
+$('foodImportBtn').addEventListener('click', () => $('foodFile').click());
+$('foodFile').addEventListener('change', e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  Papa.parse(file, { header: true, skipEmptyLines: true, complete: async r => {
+    const h = r.meta.fields || [];
+    let list;
+    if (h.includes('option_text')) {            // formato menù (meal_options)
+      list = r.data.filter(x => String(x.active).toLowerCase() !== 'false')
+        .map(x => ({ nome: x.option_text, categoria: normPortata(x.portata_label), regola: x.max_per_week ? `max ${Number(x.max_per_week)} a settimana` : '' }));
+    } else if (h.includes('nome')) {            // formato semplice: nome, categoria, regola
+      list = r.data.map(x => ({ nome: x.nome, categoria: normPortata(x.categoria), regola: x.regola }));
+    } else { alert('Il CSV deve avere una colonna “nome” (facoltative: “categoria” e “regola”).'); return; }
+    await addFoods(list);
+  } });
+});
+
+/* --- Editor dei pasti --- */
+const defaultMeals = () => [
+  ['Colazione', 25, ['Bevanda', 'Carboidrato']], ['Spuntino', 10, ['Spuntino']],
+  ['Pranzo', 30, ['Primo', 'Secondo', 'Contorno', 'Pane', 'Frutta']], ['Spuntino pomeridiano', 10, ['Spuntino']],
+  ['Cena', 25, ['Secondo', 'Contorno', 'Pane', 'Frutta']]
+].map(([nome, percentuale, portate]) => ({ nome, percentuale, portate, items: [] }));
+
+async function openDiet(id) {
+  const d = diets.find(x => x.id === id);
+  if (!d) { location.hash = '#c=' + current.id; return; }
+  await ensureFoods();
+  const { data: ms } = await db.from('meals').select('*').eq('diet_id', id).order('ordine');
+  let items = [];
+  if (ms?.length) items = (await db.from('meal_items').select('*').in('meal_id', ms.map(m => m.id)).order('ordine')).data || [];
+  M = { diet: d, meals: ms?.length
+    ? ms.map(m => ({ nome: m.nome, percentuale: m.percentuale, portate: m.portate || [],
+        items: items.filter(i => i.meal_id === m.id).map(i => ({ food_id: i.food_id, nome: i.nome_libero, portata: i.portata, giorno: i.giorno })) }))
+    : defaultMeals() };
+  const r = d.risultati || {};
+  $('dietTitle').textContent = d.titolo;
+  $('dietMeta').textContent = r.kcal ? `Piano base: ${fmt(r.kcal, 0)} kcal, proteine ${fmt(r.pro, 0)} g, carboidrati ${fmt(r.carb, 0)} g, grassi ${fmt(r.fat, 0)} g` : '';
+  $('dietBack').href = '#c=' + current.id;
+  $('mealMsg').textContent = ms?.length ? '' : 'Pasti proposti di default: modificali e premi “Salva pasti”.';
+  $('dlists').innerHTML = CATS.map((c, i) => `<datalist id="dl_${i}">${foods.filter(f => f.categoria === c).map(f => `<option value="${esc(f.nome)}"></option>`).join('')}</datalist>`).join('');
+  renderMeals();
+}
+
+const targetTxt = m => {
+  const r = M.diet.risultati || {}, f = (Number(m.percentuale) || 0) / 100;
+  return r.kcal ? `Obiettivo del pasto: ${fmt(r.kcal * f, 0)} kcal, proteine ${fmt(r.pro * f, 0)} g, carboidrati ${fmt(r.carb * f, 0)} g, grassi ${fmt(r.fat * f, 0)} g` : '';
+};
+
+function ptrHtml(m, i, p, k) {
+  const chips = m.items.map((it, n) => it.portata !== p ? '' :
+    `<span class="chip">${esc(it.nome)}${it.giorno ? ` <i>${GGS[it.giorno - 1]}</i>` : ''}<button type="button" data-act="delitem" data-m="${i}" data-n="${n}" aria-label="Togli">×</button></span>`).join('');
+  return `<div class="ptr">
+    <div class="ptr-h"><b>${esc(p)}</b><button class="lnk" type="button" data-act="delportata" data-m="${i}" data-k="${k}">Togli portata</button></div>
+    <div class="chips">${chips || '<span class="sub">Nessuna opzione</span>'}</div>
+    <div class="addrow">
+      <input id="ai_${i}_${k}" list="dl_${CATS.indexOf(p)}" placeholder="Cerca o scrivi un alimento" aria-label="Alimento">
+      <select id="ad_${i}_${k}" aria-label="Giorno"><option value="">Tutti i giorni</option>${GG.map((g, x) => `<option value="${x + 1}">${g}</option>`).join('')}</select>
+      <button class="btn" type="button" data-act="additem" data-m="${i}" data-k="${k}">Aggiungi</button>
+    </div></div>`;
+}
+
+function renderMeals() {
+  $('mealsBox').innerHTML = M.meals.map((m, i) => {
+    const libere = CATS.filter(c => !m.portate.includes(c));
+    return `<div class="panel meal">
+      <div class="meal-h">
+        <div><label for="mn_${i}">Pasto</label><input id="mn_${i}" data-m="${i}" data-f="nome" value="${esc(m.nome)}"></div>
+        <div><label for="mp_${i}">Quota (%)</label><input id="mp_${i}" type="number" min="0" max="100" step="1" data-m="${i}" data-f="percentuale" value="${esc(m.percentuale)}"></div>
+        <button class="btn danger" type="button" data-act="delmeal" data-m="${i}">Togli pasto</button>
+      </div>
+      <div class="tl-end" id="tg_${i}">${targetTxt(m)}</div>
+      ${m.portate.map((p, k) => ptrHtml(m, i, p, k)).join('')}
+      ${libere.length ? `<div class="addp"><select id="np_${i}" aria-label="Portata">${libere.map(c => `<option>${c}</option>`).join('')}</select><button class="btn" type="button" data-act="addportata" data-m="${i}">Aggiungi portata</button></div>` : ''}
+    </div>`;
+  }).join('') || '<div class="empty">Non ci sono pasti. Aggiungine uno.</div>';
+  pctCheck();
+}
+
+function pctCheck() {
+  const s = M.meals.reduce((t, m) => t + (Number(m.percentuale) || 0), 0);
+  $('pctWarn').textContent = `Le quote dei pasti sommano ${fmt(s, 1)}% invece di 100%.`;
+  $('pctWarn').classList.toggle('hidden', !M.meals.length || Math.abs(s - 100) < 0.5);
+}
+
+$('mealsBox').addEventListener('input', e => {
+  const t = e.target, i = t.dataset.m;
+  if (i == null || !t.dataset.f) return;
+  M.meals[i][t.dataset.f] = t.value;
+  if (t.dataset.f === 'percentuale') { $('tg_' + i).textContent = targetTxt(M.meals[i]); pctCheck(); }
+});
+$('mealsBox').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.closest('.addrow') && e.target.tagName === 'INPUT') {
+    e.preventDefault();
+    e.target.closest('.addrow').querySelector('[data-act=additem]').click();
+  }
+});
+$('mealsBox').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  const a = b.dataset.act, i = Number(b.dataset.m), m = M.meals[i], k = Number(b.dataset.k);
+  if (a === 'delmeal') { if (!confirm(`Togliere il pasto “${m.nome}” con tutte le sue opzioni?`)) return; M.meals.splice(i, 1); }
+  else if (a === 'delportata') { const p = m.portate[k]; m.portate.splice(k, 1); m.items = m.items.filter(it => it.portata !== p); }
+  else if (a === 'addportata') { const v = $('np_' + i).value; if (v) m.portate.push(v); }
+  else if (a === 'delitem') m.items.splice(Number(b.dataset.n), 1);
+  else if (a === 'additem') {
+    const nome = $('ai_' + i + '_' + k).value.trim();
+    if (!nome) return;
+    const p = m.portate[k], f = foods.find(x => x.nome === nome && x.categoria === p) || foods.find(x => x.nome === nome);
+    m.items.push({ food_id: f?.id || null, nome, portata: p, giorno: Number($('ad_' + i + '_' + k).value) || null });
+  }
+  renderMeals();
+});
+$('addMealBtn').addEventListener('click', () => { M.meals.push({ nome: 'Nuovo pasto', percentuale: 0, portate: [], items: [] }); renderMeals(); });
+
+$('mealSaveBtn').addEventListener('click', async () => {
+  const btn = $('mealSaveBtn');
+  btn.disabled = true;
+  $('mealMsg').textContent = '';
+  const fail = err => { $('mealMsg').textContent = 'Salvataggio non riuscito: ' + err.message; btn.disabled = false; };
+  const del = await db.from('meals').delete().eq('diet_id', M.diet.id);
+  if (del.error) return fail(del.error);
+  if (M.meals.length) {
+    const ins = await db.from('meals').insert(M.meals.map((m, i) => ({
+      diet_id: M.diet.id, nome: m.nome.trim() || `Pasto ${i + 1}`, ordine: i + 1, percentuale: Number(m.percentuale) || 0, portate: m.portate }))).select('id, ordine');
+    if (ins.error) return fail(ins.error);
+    const byOrd = Object.fromEntries(ins.data.map(r => [r.ordine, r.id]));
+    const items = M.meals.flatMap((m, i) => m.items.map((it, n) => ({
+      meal_id: byOrd[i + 1], food_id: it.food_id || null, nome_libero: it.nome, portata: it.portata, giorno: it.giorno || null, ordine: n })));
+    if (items.length) { const r = await db.from('meal_items').insert(items); if (r.error) return fail(r.error); }
+  }
+  btn.disabled = false;
+  $('mealMsg').textContent = 'Pasti salvati.';
+});
+
+$('dietDelBtn').addEventListener('click', async () => {
+  if (!confirm(`Eliminare “${M.diet.titolo}” con settimana, timeline e pasti?`)) return;
+  const { error } = await db.from('diets').delete().eq('id', M.diet.id);
+  if (error) { $('mealMsg').textContent = 'Eliminazione non riuscita: ' + error.message; return; }
+  location.hash = '#c=' + current.id;
+});
+
+$('dietList').addEventListener('click', e => { const r = e.target.closest('.row.d:not(.head)'); if (r) location.hash = '#c=' + current.id + '/d=' + r.dataset.id; });
+$('dietList').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset.id) location.hash = '#c=' + current.id + '/d=' + e.target.dataset.id; });
 
 /* ---------- Avvio ---------- */
 async function start() {
