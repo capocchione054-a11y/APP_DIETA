@@ -107,6 +107,27 @@
   .panel .stats { margin: 16px 0 6px; }
   .row.d { grid-template-columns: 1.4fr 1fr 1fr 1.6fr; cursor: default; }
   .row.d:hover { background: var(--surface); }
+  .days { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px; }
+  .days label { font-size: 13px; margin: 0 0 2px; }
+  .days select { padding: 6px 4px; font-size: 14px; }
+  #k_faseBox > label, #k_daysBox > label { margin-top: 14px; }
+  table.wk { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 12px; }
+  table.wk th { text-align: left; color: var(--muted); font-weight: 500; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+  table.wk td { padding: 6px 4px; border-bottom: 1px solid var(--line); }
+  .tl-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+  .tl-opt { width: 280px; max-width: 100%; }
+  .tl-row { display: grid; grid-template-columns: 1.3fr 1fr .7fr 1.6fr auto; gap: 10px; align-items: end; margin-top: 12px; }
+  .tl-end { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .row.w { grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr 1fr; cursor: default; }
+  .row.p { grid-template-columns: 1.2fr 1fr 1.3fr 1.6fr; cursor: default; }
+  .row.w:not(.head):hover, .row.p:not(.head):hover { background: var(--surface); }
+  @media (max-width: 760px) {
+    .row.w { grid-template-columns: 1fr 1fr 1fr; }
+    .row.w > :nth-child(n+4) { display: none; }
+    .row.p { grid-template-columns: 1fr 1fr 1fr; }
+    .row.p > :nth-child(4) { display: none; }
+    .tl-row { grid-template-columns: 1fr 1fr; }
+  }
   @media (max-width: 760px) {
     .calc { grid-template-columns: 1fr; }
     .row.d { grid-template-columns: 1.4fr 1fr 1fr; }
@@ -180,6 +201,8 @@
       <div class="list" id="measList"></div>
       <h3 class="sec" style="margin-top:26px">Diete</h3>
       <div class="list" id="dietList"></div>
+      <h3 class="sec" style="margin-top:26px">Ultima dieta: settimana e timeline</h3>
+      <div class="list" id="lastDiet"></div>
     </div>
 
     <div id="viewCalc" class="hidden">
@@ -200,11 +223,23 @@
           <label for="k_attiv">Livello di attività</label><select id="k_attiv"></select>
           <label for="k_mb">Formula del metabolismo basale</label><select id="k_mb"></select>
           <label for="k_tdee">Formula del fabbisogno totale</label><select id="k_tdee"></select>
-          <label for="k_fase">Fase</label><select id="k_fase"></select>
+          <label for="k_mode">Struttura della settimana</label>
+          <select id="k_mode"><option value="iso">Isocalorica</option><option value="onoff">Cicli ON/OFF (carb cycling)</option><option value="ricomp">Ricomposizione corporea</option></select>
+          <div id="k_faseBox"><label for="k_fase">Fase</label><select id="k_fase"></select></div>
+          <div id="k_daysBox"><label>Tipo di giorno</label><div class="days" id="k_days"></div></div>
           <div id="k_sliders"></div>
           <label for="k_note">Note sulla dieta</label><textarea id="k_note"></textarea>
         </form>
         <div class="panel" id="calcOut"></div>
+      </div>
+      <div class="panel" id="tlBox" style="margin-top:18px">
+        <div class="tl-head">
+          <h3 class="sec" style="margin-top:14px">Timeline delle fasi</h3>
+          <div class="tl-opt"><label for="k_dbw">Promemoria diet break dopo (settimane di cut)</label><input id="k_dbw" type="number" min="4" max="8" value="6"></div>
+        </div>
+        <div id="tlRows"></div>
+        <div class="warn hidden" id="tlWarn"></div>
+        <button class="btn" id="tlAdd" type="button" style="margin-top:14px">Aggiungi fase</button>
       </div>
     </div>
   </main>
@@ -222,7 +257,9 @@
       <div><label for="f_data_nascita">Data di nascita</label><input id="f_data_nascita" type="date"></div>
       <div><label for="f_altezza_cm">Altezza (cm)</label><input id="f_altezza_cm" type="number" step="0.1" min="100" max="250"></div>
       <div><label for="f_telefono">Telefono</label><input id="f_telefono" type="tel"></div>
-      <div class="full"><label for="f_email">Email</label><input id="f_email" type="email"></div>
+      <div><label for="f_somatotipo">Somatotipo</label>
+        <select id="f_somatotipo"><option value="">Non indicato</option><option value="ecto">Ectomorfo</option><option value="meso">Mesomorfo</option><option value="endo">Endomorfo</option></select></div>
+      <div><label for="f_email">Email</label><input id="f_email" type="email"></div>
       <div class="full"><label for="f_obiettivo">Obiettivo</label><input id="f_obiettivo" placeholder="Es. dimagrimento, massa, ricomposizione"></div>
       <div class="full"><label for="f_anamnesi">Anamnesi</label><textarea id="f_anamnesi"></textarea></div>
       <div><label for="f_allergie">Allergie</label><textarea id="f_allergie"></textarea></div>
@@ -279,7 +316,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const $ = id => document.getElementById(id);
-const FIELDS = ['nome','cognome','sesso','data_nascita','altezza_cm','telefono','email','obiettivo','anamnesi','allergie','intolleranze','note'];
+const FIELDS = ['nome','cognome','sesso','data_nascita','altezza_cm','telefono','somatotipo','email','obiettivo','anamnesi','allergie','intolleranze','note'];
 let clients = [];
 let editingId = null;
 
@@ -392,7 +429,7 @@ const PLICHE = {
   F: [['tricipite', 'Tricipite'], ['soprailiaca', 'Soprailiaca'], ['coscia', 'Coscia']]
 };
 const MISURE = ['vita', 'fianchi', 'petto', 'braccio', 'coscia'];
-let current = null, measurements = [], diets = [], editingMeas = null, charts = [];
+let current = null, measurements = [], diets = [], lastDays = [], lastPhases = [], editingMeas = null, charts = [];
 
 const num = v => (v === '' || v == null || isNaN(Number(v))) ? null : Number(v);
 const fmt = (v, d = 1) => v == null ? '-' : Number(v).toLocaleString('it-IT', { maximumFractionDigits: d });
@@ -445,6 +482,15 @@ async function showClient(c) {
   if (current !== c) return;
   measurements = ms.error ? [] : ms.data;
   diets = ds.error ? [] : ds.data;
+  lastDays = []; lastPhases = [];
+  if (diets[0]) {
+    const [a, b] = await Promise.all([
+      db.from('diet_days').select('*').eq('diet_id', diets[0].id).order('giorno'),
+      db.from('diet_phases').select('*').eq('diet_id', diets[0].id).order('inizio')
+    ]);
+    if (current !== c) return;
+    lastDays = a.data || []; lastPhases = b.data || [];
+  }
   renderMeasurements();
   renderDiets();
 }
@@ -456,6 +502,18 @@ function renderDiets() {
           <div>${esc(d.titolo)}</div><div>${fmtDate(d.data)}</div><div>${fmt(r.kcal, 0)}</div>
           <div>${fmt(r.pro, 0)} g, ${fmt(r.carb, 0)} g, ${fmt(r.fat, 0)} g</div></div>`; }).join('')
     : '<div class="empty">Non ci sono diete. Crea la prima con “Nuova dieta”.</div>';
+
+  if (!diets.length) { $('lastDiet').innerHTML = '<div class="empty">Comparirà dopo aver salvato la prima dieta.</div>'; return; }
+  const week = lastDays.length
+    ? '<div class="row w head"><div>Giorno</div><div>Tipo</div><div>Kcal</div><div>Proteine</div><div>Carboidrati</div><div>Grassi</div></div>'
+      + lastDays.map(d => `<div class="row w"><div>${GG[d.giorno - 1]}</div><div>${TIPI[d.tipo] || ''}</div><div>${fmt(d.kcal, 0)}</div><div>${fmt(d.pro, 0)} g</div><div>${fmt(d.carb, 0)} g</div><div>${fmt(d.fat, 0)} g</div></div>`).join('')
+    : '';
+  const tl = lastPhases.length
+    ? '<div class="row p head"><div>Fase</div><div>Dal</div><div>Al</div><div>Note</div></div>'
+      + lastPhases.map(f => `<div class="row p"><div>${esc(FASI_TL[f.tipo] || f.tipo)}</div><div>${fmtDate(f.inizio)}</div>
+          <div>${fmtDate(addDays(f.inizio, f.settimane * 7 - 1))} (${f.settimane} sett.)</div><div>${esc(f.note)}</div></div>`).join('')
+    : '<div class="empty">Questa dieta non ha una timeline.</div>';
+  $('lastDiet').innerHTML = week + tl;
 }
 
 function makeChart(id, pts, get, unit) {
@@ -579,8 +637,13 @@ $('measDelBtn').addEventListener('click', async () => {
 });
 
 /* ---------- Calcolatore ---------- */
-let K = { fase: 'cut', v: {} }, OUT = null;
+const GG = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
+const TIPI = { on: 'ON', off: 'OFF', refeed: 'Refeed', normo: 'Normale', iper: 'Iper', ipo: 'Ipo' };
+const FASI_TL = { reset: 'Reset metabolico', cut: 'Cut', bulk: 'Bulk', mantenimento: 'Mantenimento', diet_break: 'Diet break', ricomposizione: 'Ricomposizione' };
+const today = () => new Date().toISOString().slice(0, 10);
+const addDays = (iso, n) => new Date(Date.parse(iso) + n * 864e5).toISOString().slice(0, 10);
 const row = (a, b) => `<div class="kv"><span>${a}</span><span>${b}</span></div>`;
+let K = { mode: 'iso', fase: 'cut', v: {}, days: [], phases: [] }, OUT = null, WEEK = null;
 
 (function fillSelects() {
   const opt = o => Object.entries(o).map(([k, x]) => `<option value="${k}">${esc(x.nome)}</option>`).join('');
@@ -589,6 +652,8 @@ const row = (a, b) => `<div class="kv"><span>${a}</span><span>${b}</span></div>`
   $('k_tdee').innerHTML = opt(Calc.TDEE);
   $('k_fase').innerHTML = opt(Calc.FASI);
 })();
+
+const phaseOf = () => K.mode === 'ricomp' ? 'ricomposizione' : ({ reset: 'reset', cut: 'cut', bulk: 'bulk', mant: 'mantenimento' })[K.fase];
 
 function initCalc() {
   const c = current, eta = ageAt(c.data_nascita);
@@ -599,6 +664,7 @@ function initCalc() {
   $('calcMiss').textContent = `Per calcolare servono ${miss.join(', ')} nella scheda del cliente.`;
   $('calcMiss').classList.toggle('hidden', !miss.length);
   $('calcBox').classList.toggle('hidden', !!miss.length);
+  $('tlBox').classList.toggle('hidden', !!miss.length);
   $('saveDietBtn').classList.toggle('hidden', !!miss.length);
   if (miss.length) return;
 
@@ -612,27 +678,55 @@ function initCalc() {
   $('k_note').value = '';
   const soglia = c.sesso === 'M' ? 31 : 28;
   K.fase = (prev.kcalAtt && last?.peso_kg && prev.kcalAtt / last.peso_kg < soglia) ? 'reset' : 'cut';
+  K.mode = prev.mode || 'iso';
+  K.days = [...Calc.GIORNI_DEF[K.mode]];
   $('k_fase').value = K.fase;
-  setSliders();
+  $('k_mode').value = K.mode;
+  $('k_faseBox').classList.toggle('hidden', K.mode === 'ricomp');
+  K.phases = [{ tipo: phaseOf(), inizio: today(), settimane: 8, note: '', auto: true }];
+  $('k_dbw').value = prev.dietBreak || 6;
+  renderDays();
+  renderTl();
+  checkBreak();
+  setSliders(false);
 }
 
-function setSliders() {
-  const spec = Calc.sliders(K.fase, current.sesso);
-  K.v = Object.fromEntries(spec.map(s => [s[0], s[5]]));
-  $('k_sliders').innerHTML = spec.map(([k, l, u, mn, mx, df, st]) =>
-    `<div class="sl"><div class="top"><label for="s_${k}">${l}</label><b id="sv_${k}">${fmt(df, 2)} ${u}</b></div>
-     <input type="range" id="s_${k}" data-k="${k}" data-u="${u}" min="${mn}" max="${mx}" step="${st}" value="${df}"></div>`).join('');
+function renderDays() {
+  const t = Calc.GIORNI_TIPI[K.mode];
+  $('k_days').innerHTML = GG.map((g, i) => `<div><label for="d_${i}">${g.slice(0, 3)}</label>
+    <select id="d_${i}" data-i="${i}">${Object.entries(t).map(([k, n]) => `<option value="${k}"${K.days[i] === k ? ' selected' : ''}>${n}</option>`).join('')}</select></div>`).join('');
+}
+
+function setSliders(keep) {
+  const spec = K.mode === 'ricomp' ? Calc.SLIDERS_RICOMP
+    : [...Calc.sliders(K.fase, current.sesso), ...Calc.slidersExtra(K.mode, K.days, current.somatotipo)];
+  K.v = Object.fromEntries(spec.map(s => [s[0], keep && K.v[s[0]] != null ? K.v[s[0]] : s[5]]));
+  $('k_sliders').innerHTML = spec.map(([k, l, u, mn, mx, , st]) =>
+    `<div class="sl"><div class="top"><label for="s_${k}">${l}</label><b id="sv_${k}">${fmt(K.v[k], 2)} ${u}</b></div>
+     <input type="range" id="s_${k}" data-k="${k}" data-u="${u}" min="${mn}" max="${mx}" step="${st}" value="${K.v[k]}"></div>`).join('');
   recalc();
 }
 
+function syncAutoPhase() {
+  if (K.phases.length === 1 && K.phases[0].auto) { K.phases[0].tipo = phaseOf(); renderTl(); }
+}
+
 $('calcForm').addEventListener('input', e => {
-  if (e.target.type === 'range') {
-    const k = e.target.dataset.k;
-    K.v[k] = Number(e.target.value);
-    $('sv_' + k).textContent = fmt(K.v[k], 2) + ' ' + e.target.dataset.u;
+  const t = e.target;
+  if (t.type === 'range') {
+    K.v[t.dataset.k] = Number(t.value);
+    $('sv_' + t.dataset.k).textContent = fmt(K.v[t.dataset.k], 2) + ' ' + t.dataset.u;
     recalc();
-  } else if (e.target.id === 'k_fase') { K.fase = e.target.value; setSliders(); }
-  else recalc();
+  } else if (t.id === 'k_mode') {
+    K.mode = t.value;
+    K.days = [...Calc.GIORNI_DEF[K.mode]];
+    $('k_faseBox').classList.toggle('hidden', K.mode === 'ricomp');
+    renderDays(); syncAutoPhase(); setSliders(false);
+  } else if (t.id === 'k_fase') {
+    K.fase = t.value; syncAutoPhase(); setSliders(false);
+  } else if (t.closest('#k_days')) {
+    K.days[Number(t.dataset.i)] = t.value; setSliders(true);
+  } else recalc();
 });
 
 function readCalc() {
@@ -641,48 +735,140 @@ function readCalc() {
     kcalAtt: num($('k_att').value), att: $('k_attiv').value, mb: $('k_mb').value, tdee: $('k_tdee').value };
 }
 
+function weekTable(giorni) {
+  return `<table class="wk"><thead><tr><th>Giorno</th><th>Tipo</th><th>Kcal</th><th>Prot. (g)</th><th>Carb. (g)</th><th>Grassi (g)</th></tr></thead><tbody>`
+    + giorni.map((d, i) => `<tr><td>${GG[i].slice(0, 3)}</td><td>${TIPI[d.tipo]}</td><td>${fmt(d.kcal, 0)}</td><td>${fmt(d.pro, 0)}</td><td>${fmt(d.carb, 0)}</td><td>${fmt(d.fat, 0)}</td></tr>`).join('')
+    + '</tbody></table>';
+}
+
 function recalc() {
   const p = readCalc();
-  if (!p.peso) { OUT = null; $('calcOut').innerHTML = '<div class="empty">Inserisci il peso del cliente per vedere il calcolo.</div>'; return; }
-  const o = OUT = Calc.calcola(p, K.fase, K.v);
-  const bmr = Object.entries(o.mbAll).map(([k, v]) => `${Calc.BMR[k].corto} ${fmt(v, 0)}`).join(', ');
+  OUT = WEEK = null;
+  if (!p.peso) { $('calcOut').innerHTML = '<div class="empty">Inserisci il peso del cliente per vedere il calcolo.</div>'; return; }
+  const ricomp = K.mode === 'ricomp';
+  let o, w, avvisi, labels, extra = '';
+
+  if (ricomp) {
+    const b = Calc.calcola(p, 'mant', { pro: 1.7, fat: 0.8 });   // serve solo per basale, fabbisogno e check
+    const r = Calc.ricomp(p, b, K.v, K.days);
+    if (r.errore) { $('calcOut').innerHTML = `<div class="warn">${esc(r.errore)}</div>`; return; }
+    const af = Calc.acquaFibre(p.peso, r.medie.kcal, false);
+    o = { ...b, kcal: Math.round(r.medie.kcal), pro: Math.round(r.medie.pro), carb: Math.round(r.medie.carb), fat: Math.round(r.medie.fat), acqua: af.acqua, fibre: af.fibre, quota: null };
+    w = r; avvisi = r.avvisi;
+    labels = ['Kcal medie al giorno', 'Proteine al giorno', 'Carboidrati medi', 'Grassi al giorno'];
+    extra = row('Massa magra', fmt(r.lbm, 1) + ' kg') + row('Carboidrati attorno all\'allenamento', `${r.periwo[0]}-${r.periwo[1]} g`);
+  } else {
+    o = Calc.calcola(p, K.fase, K.v);
+    w = Calc.settimana(p, o, K.mode, K.days, K.v);
+    avvisi = [...o.avvisi, ...w.avvisi];
+    labels = ['Kcal al giorno', 'Proteine', 'Carboidrati', 'Grassi'];
+  }
+  OUT = o; WEEK = w;
+  const varied = new Set(w.giorni.map(d => d.kcal + '/' + d.carb)).size > 1;
+  if (varied && !ricomp) labels = ['Kcal base al giorno', 'Proteine', 'Carboidrati base', 'Grassi'];
   const q = o.quota;
+  const confronto = Object.entries(o.mbAll).map(([k, v]) => `${Calc.BMR[k].corto} ${fmt(v, 0)}`).join(', ');
+  const af = o.acqua;
+
   $('calcOut').innerHTML = `
     <div class="stats">
-      <div class="stat"><small>Kcal al giorno</small><b>${fmt(o.kcal, 0)}</b></div>
-      <div class="stat"><small>Proteine</small><b>${fmt(o.pro, 0)} g</b></div>
-      <div class="stat"><small>Carboidrati</small><b>${fmt(o.carb, 0)} g</b></div>
-      <div class="stat"><small>Grassi</small><b>${fmt(o.fat, 0)} g</b></div>
+      <div class="stat"><small>${labels[0]}</small><b>${fmt(o.kcal, 0)}</b></div>
+      <div class="stat"><small>${labels[1]}</small><b>${fmt(o.pro, 0)} g</b></div>
+      <div class="stat"><small>${labels[2]}</small><b>${fmt(o.carb, 0)} g</b></div>
+      <div class="stat"><small>${labels[3]}</small><b>${fmt(o.fat, 0)} g</b></div>
     </div>
-    ${row('Quota delle calorie', `proteine ${q.pro}%, carboidrati ${q.carb}%, grassi ${q.fat}%`)}
+    ${varied ? weekTable(w.giorni) + row('Media settimanale', fmt(w.media, 0) + ' kcal al giorno') : ''}
+    ${q ? row('Quota delle calorie', `proteine ${q.pro}%, carboidrati ${q.carb}%, grassi ${q.fat}%`) : ''}
+    ${extra}
     ${row('Metabolismo basale', fmt(o.mb, 0) + ' kcal')}
-    ${row('Confronto formule', bmr)}
+    ${row('Confronto formule', confronto)}
     ${row('Fabbisogno totale', fmt(o.tdee, 0) + ' kcal')}
     ${row('Check metabolico', o.check)}
     ${o.reset ? row('Piano del reset', `+${fmt(o.reset.diff, 0)} kcal in circa ${o.reset.settimane[0]}-${o.reset.settimane[1]} settimane (+40-60 kcal ogni 7-14 giorni)`) : ''}
     ${o.ritmo ? row('Ritmo stimato', `${fmt(o.ritmo.kg, 2)} kg a settimana (${fmt(o.ritmo.pct, 2)}% del peso)`) : ''}
-    ${row('Acqua', o.acqua.min === o.acqua.max ? `${fmt(o.acqua.min, 1)} L, oppure ${fmt(o.acqua.f2, 1)} L con la seconda formula`
-        : `${fmt(o.acqua.min, 1)}-${fmt(o.acqua.max, 1)} L, oppure ${fmt(o.acqua.f2, 1)} L con la seconda formula`)}
+    ${row('Acqua', (af.min === af.max ? `${fmt(af.min, 1)} L` : `${fmt(af.min, 1)}-${fmt(af.max, 1)} L`) + `, oppure ${fmt(af.f2, 1)} L con la seconda formula`)}
     ${row('Fibre', `${o.fibre.min}-${o.fibre.max} g (suggerite ${o.fibre.sug} g)`)}
-    ${o.avvisi.map(a => `<div class="warn">${esc(a)}</div>`).join('')}`;
+    ${avvisi.map(a => `<div class="warn">${esc(a)}</div>`).join('')}`;
 }
 
+/* ---------- Timeline delle fasi ---------- */
+const tlEnd = f => f.inizio && Number(f.settimane) > 0 ? 'Fino al ' + fmtDate(addDays(f.inizio, Number(f.settimane) * 7 - 1)) : '';
+const tlOpts = sel => Object.entries(FASI_TL).map(([k, n]) => `<option value="${k}"${k === sel ? ' selected' : ''}>${n}</option>`).join('');
+
+function renderTl() {
+  $('tlRows').innerHTML = K.phases.map((f, i) => `<div class="tl-row">
+      <div><label for="tp_${i}">Fase</label><select id="tp_${i}" data-i="${i}" data-f="tipo">${tlOpts(f.tipo)}</select></div>
+      <div><label for="ti_${i}">Inizio</label><input id="ti_${i}" type="date" data-i="${i}" data-f="inizio" value="${esc(f.inizio)}"></div>
+      <div><label for="ts_${i}">Settimane</label><input id="ts_${i}" type="number" min="1" max="52" data-i="${i}" data-f="settimane" value="${esc(f.settimane)}"></div>
+      <div><label for="tn_${i}">Note</label><input id="tn_${i}" data-i="${i}" data-f="note" value="${esc(f.note)}"></div>
+      <button class="btn danger" type="button" data-del="${i}">Togli</button>
+    </div><div class="tl-end" id="tle_${i}">${tlEnd(f)}</div>`).join('');
+}
+
+function checkBreak() {
+  const lim = Number($('k_dbw').value) || 6;
+  let run = 0, msg = '';
+  for (const f of K.phases) {
+    if (f.tipo === 'cut') {
+      run += Number(f.settimane) || 0;
+      if (run > lim) { msg = `Il cut continuo arriva a ${run} settimane: il documento consiglia 1-2 settimane in mantenimento (diet break) ogni 4-8 settimane di restrizione.`; break; }
+    } else if (f.tipo === 'diet_break' || f.tipo === 'mantenimento') run = 0;
+  }
+  $('tlWarn').textContent = msg;
+  $('tlWarn').classList.toggle('hidden', !msg);
+}
+
+$('tlRows').addEventListener('input', e => {
+  const t = e.target, i = t.dataset.i;
+  if (i == null) return;
+  const f = K.phases[i];
+  f[t.dataset.f] = t.value; f.auto = false;
+  $('tle_' + i).textContent = tlEnd(f);
+  checkBreak();
+});
+$('tlRows').addEventListener('click', e => {
+  const d = e.target.dataset.del;
+  if (d == null) return;
+  K.phases.splice(Number(d), 1); renderTl(); checkBreak();
+});
+$('tlAdd').addEventListener('click', () => {
+  const l = K.phases[K.phases.length - 1];
+  K.phases.push({
+    tipo: l ? (l.tipo === 'cut' ? 'diet_break' : 'mantenimento') : phaseOf(),
+    inizio: l && l.inizio && Number(l.settimane) > 0 ? addDays(l.inizio, Number(l.settimane) * 7) : today(),
+    settimane: 2, note: ''
+  });
+  renderTl(); checkBreak();
+});
+$('k_dbw').addEventListener('input', checkBreak);
+
+/* ---------- Salvataggio ---------- */
 $('saveDietBtn').addEventListener('click', async () => {
-  if (!OUT) { alert('Inserisci il peso del cliente.'); return; }
+  if (!OUT || !WEEK) { alert('Inserisci il peso del cliente.'); return; }
   const btn = $('saveDietBtn');
   btn.disabled = true;
   const { data: prev } = await db.from('diets').select('versione').eq('client_id', current.id).order('versione', { ascending: false }).limit(1);
   const versione = (prev?.[0]?.versione || 0) + 1;
-  const p = readCalc();
-  const { error } = await db.from('diets').insert({
-    client_id: current.id, versione,
-    titolo: `Dieta ${versione}: ${Calc.FASI[K.fase].nome}`,
-    data: new Date().toISOString().slice(0, 10),
-    parametri: { ...p, fase: K.fase, slider: K.v },
-    risultati: OUT, note: $('k_note').value.trim() || null
-  });
+  const nome = K.mode === 'ricomp' ? 'Ricomposizione corporea' : Calc.FASI[K.fase].nome + (K.mode === 'onoff' ? ', cicli ON/OFF' : '');
+  const ins = await db.from('diets').insert({
+    client_id: current.id, versione, titolo: `Dieta ${versione}: ${nome}`, data: today(),
+    parametri: { ...readCalc(), fase: K.fase, mode: K.mode, slider: K.v, giorni: K.days, dietBreak: Number($('k_dbw').value) || 6 },
+    risultati: { ...OUT, media: Math.round(WEEK.media) }, note: $('k_note').value.trim() || null
+  }).select('id').single();
+  if (ins.error) { btn.disabled = false; alert('Salvataggio non riuscito: ' + ins.error.message); return; }
+
+  const id = ins.data.id;
+  const giorni = WEEK.giorni.map((d, i) => ({ diet_id: id, giorno: i + 1, tipo: d.tipo, kcal: d.kcal, pro: d.pro, carb: d.carb, fat: d.fat }));
+  const fasi = K.phases.filter(f => f.inizio && Number(f.settimane) > 0)
+    .map(f => ({ diet_id: id, tipo: f.tipo, inizio: f.inizio, settimane: Number(f.settimane), note: f.note || null }));
+  const r1 = await db.from('diet_days').insert(giorni);
+  const r2 = fasi.length ? await db.from('diet_phases').insert(fasi) : {};
   btn.disabled = false;
-  if (error) { alert('Salvataggio non riuscito: ' + error.message); return; }
+  if (r1.error || r2.error) {
+    await db.from('diets').delete().eq('id', id);
+    alert('Salvataggio non riuscito: ' + (r1.error || r2.error).message);
+    return;
+  }
   location.hash = '#c=' + current.id;
 });
 
