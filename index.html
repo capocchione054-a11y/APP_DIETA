@@ -288,6 +288,7 @@
         <div><h2 id="dietTitle"></h2><p id="dietMeta"></p></div>
         <div class="actions">
           <button class="btn danger" id="dietDelBtn" type="button">Elimina dieta</button>
+          <button class="btn" id="pdfBtn" type="button">Scarica PDF</button>
           <button class="btn primary" id="mealSaveBtn" type="button">Salva pasti</button>
         </div>
       </div>
@@ -383,7 +384,10 @@
 
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 <script src="calc.js"></script>
+<script src="pdf.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 const SUPABASE_URL = 'https://gwjipgrobvbowyeenncc.supabase.co';
@@ -1073,13 +1077,18 @@ async function openDiet(id) {
   const d = diets.find(x => x.id === id);
   if (!d) { location.hash = '#c=' + current.id; return; }
   await ensureFoods();
-  const { data: ms } = await db.from('meals').select('*').eq('diet_id', id).order('ordine');
+  const [{ data: ms }, dd, pp] = await Promise.all([
+    db.from('meals').select('*').eq('diet_id', id).order('ordine'),
+    db.from('diet_days').select('*').eq('diet_id', id).order('giorno'),
+    db.from('diet_phases').select('*').eq('diet_id', id).order('inizio')
+  ]);
   let items = [];
   if (ms?.length) items = (await db.from('meal_items').select('*').in('meal_id', ms.map(m => m.id)).order('ordine')).data || [];
   M = { diet: d, meals: ms?.length
     ? ms.map(m => ({ nome: m.nome, percentuale: m.percentuale, portate: m.portate || [],
         items: items.filter(i => i.meal_id === m.id).map(i => ({ food_id: i.food_id, nome: i.nome_libero, portata: i.portata, giorno: i.giorno })) }))
     : defaultMeals() };
+  M.days = dd.data || []; M.phases = pp.data || [];
   const r = d.risultati || {};
   $('dietTitle').textContent = d.titolo;
   $('dietMeta').textContent = r.kcal ? `Piano base: ${fmt(r.kcal, 0)} kcal, proteine ${fmt(r.pro, 0)} g, carboidrati ${fmt(r.carb, 0)} g, grassi ${fmt(r.fat, 0)} g` : '';
@@ -1178,6 +1187,20 @@ $('mealSaveBtn').addEventListener('click', async () => {
   }
   btn.disabled = false;
   $('mealMsg').textContent = 'Pasti salvati.';
+});
+
+$('pdfBtn').addEventListener('click', () => {
+  if (!window.jspdf || typeof PdfDieta === 'undefined') { alert('La libreria PDF non è stata caricata: controlla la connessione e ricarica la pagina.'); return; }
+  const c = current, d = M.diet;
+  const regola = it => (foods.find(f => f.id === it.food_id) || foods.find(f => f.nome === it.nome))?.regola || '';
+  const dati = {
+    cliente: { nome: c.nome, cognome: c.cognome, eta: ageAt(c.data_nascita, d.data), altezza: c.altezza_cm },
+    dieta: d, giorni: M.days, fasi: M.phases,
+    pasti: M.meals.map(m => ({ nome: m.nome, percentuale: m.percentuale, portate: m.portate,
+      items: m.items.map(it => ({ nome: it.nome, portata: it.portata, giorno: it.giorno, regola: regola(it) })) }))
+  };
+  const doc = PdfDieta.crea(window.jspdf.jsPDF, dati);
+  doc.save(`Dieta_${c.cognome}_${c.nome}_${d.data}.pdf`.replace(/\s+/g, '_'));
 });
 
 $('dietDelBtn').addEventListener('click', async () => {
