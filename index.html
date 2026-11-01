@@ -135,14 +135,14 @@
   .chip button { border: 0; background: none; cursor: pointer; font-size: 16px; line-height: 1; padding: 2px 6px; color: var(--muted); }
   .addrow { display: grid; grid-template-columns: 1fr 150px auto; gap: 8px; }
   .addp { display: flex; gap: 8px; margin-top: 16px; max-width: 380px; }
-  .row.f { grid-template-columns: 2.6fr 1fr 1.2fr; }
+  .row.f { grid-template-columns: 2.4fr 1fr 1.8fr 1fr; }
   @media (max-width: 760px) {
     .meal-h { grid-template-columns: 1fr 90px; }
     .meal-h .btn { grid-column: 1 / -1; }
     .addrow { grid-template-columns: 1fr 1fr; }
     .addrow input { grid-column: 1 / -1; }
     .row.f { grid-template-columns: 1fr 1fr; }
-    .row.f > :nth-child(3) { display: none; }
+    .row.f > :nth-child(n+3) { display: none; }
   }
   @media (max-width: 760px) {
     .row.w { grid-template-columns: 1fr 1fr 1fr; }
@@ -374,6 +374,12 @@
       <div class="full"><label for="fo_nome">Alimento o opzione (con la quantità, se vuoi)</label><textarea id="fo_nome" required></textarea></div>
       <div><label for="fo_cat">Categoria (portata)</label><select id="fo_cat"></select></div>
       <div><label for="fo_regola">Regola (facoltativa)</label><input id="fo_regola" placeholder="Es. max 1 a settimana"></div>
+      <div class="full grp">Valori nutrizionali (facoltativi, per 100 g)</div>
+      <div><label for="fo_g">Porzione indicata nel nome (g)</label><input id="fo_g" type="number" step="1" min="0"></div>
+      <div><label for="fo_kcal">Kcal</label><input id="fo_kcal" type="number" step="0.1" min="0"></div>
+      <div><label for="fo_p">Proteine (g)</label><input id="fo_p" type="number" step="0.1" min="0"></div>
+      <div><label for="fo_c">Carboidrati (g)</label><input id="fo_c" type="number" step="0.1" min="0"></div>
+      <div><label for="fo_f">Grassi (g)</label><input id="fo_f" type="number" step="0.1" min="0"></div>
     </div>
     <div class="msg" id="foodMsg" role="alert"></div>
     <div class="dlg-foot">
@@ -1005,12 +1011,20 @@ async function loadFoods() {
 }
 const ensureFoods = async () => { if (!foodsLoaded) await loadFoods(); };
 
+// Valori della porzione indicata nel nome (se noti), altrimenti kcal per 100 g
+function macroTxt(f) {
+  if (f.kcal100 == null) return '';
+  if (!f.porzione_g) return `${fmt(f.kcal100, 0)} kcal per 100 g`;
+  const q = f.porzione_g / 100;
+  return `${fmt(f.kcal100 * q, 0)} kcal, P ${fmt((f.pro100 ?? 0) * q, 0)}, C ${fmt((f.carb100 ?? 0) * q, 0)}, G ${fmt((f.fat100 ?? 0) * q, 0)}`;
+}
+
 function renderFoods() {
   const q = $('foodSearch').value.trim().toLowerCase(), cat = $('foodCat').value;
   const rows = foods.filter(f => (!cat || f.categoria === cat) && f.nome.toLowerCase().includes(q));
   $('foodCount').textContent = foods.length ? `${rows.length} di ${foods.length} alimenti` : '';
   $('foodList').innerHTML = rows.length
-    ? rows.map(f => `<div class="row f" tabindex="0" role="button" data-id="${esc(f.id)}"><div>${esc(f.nome)}</div><div class="sub">${esc(f.categoria)}</div><div class="sub">${esc(f.regola)}</div></div>`).join('')
+    ? rows.map(f => `<div class="row f" tabindex="0" role="button" data-id="${esc(f.id)}"><div>${esc(f.nome)}</div><div class="sub">${esc(f.categoria)}</div><div class="sub">${esc(macroTxt(f))}</div><div class="sub">${esc(f.regola)}</div></div>`).join('')
     : `<div class="empty">${foods.length ? 'Nessun alimento corrisponde alla ricerca.' : 'La libreria è vuota. Importa un CSV o carica la lista d’esempio.'}</div>`;
 }
 $('foodSearch').addEventListener('input', renderFoods);
@@ -1024,6 +1038,7 @@ function openFood(id) {
   editingFood = id || null;
   const f = id ? foods.find(x => x.id === id) : {};
   $('fo_nome').value = f.nome || ''; $('fo_cat').value = f.categoria || ''; $('fo_regola').value = f.regola || '';
+  $('fo_g').value = f.porzione_g ?? ''; $('fo_kcal').value = f.kcal100 ?? ''; $('fo_p').value = f.pro100 ?? ''; $('fo_c').value = f.carb100 ?? ''; $('fo_f').value = f.fat100 ?? '';
   $('foodTitle').textContent = id ? 'Modifica alimento' : 'Nuovo alimento';
   $('foodDelBtn').classList.toggle('hidden', !id);
   $('foodMsg').textContent = '';
@@ -1031,7 +1046,8 @@ function openFood(id) {
 }
 $('foodForm').addEventListener('submit', async e => {
   e.preventDefault();
-  const p = { nome: $('fo_nome').value.trim(), categoria: $('fo_cat').value || null, regola: $('fo_regola').value.trim() || null };
+  const p = { nome: $('fo_nome').value.trim(), categoria: $('fo_cat').value || null, regola: $('fo_regola').value.trim() || null,
+    porzione_g: num($('fo_g').value), kcal100: num($('fo_kcal').value), pro100: num($('fo_p').value), carb100: num($('fo_c').value), fat100: num($('fo_f').value) };
   const res = editingFood ? await db.from('foods').update(p).eq('id', editingFood) : await db.from('foods').insert(p);
   if (res.error) { $('foodMsg').textContent = res.error.code === '23505' ? 'Esiste già un alimento con questo nome.' : 'Salvataggio non riuscito: ' + res.error.message; return; }
   $('foodDlg').close(); await loadFoods();
@@ -1052,21 +1068,33 @@ function normPortata(s) {
   return CATS.find(c => c.toLowerCase() === base) || null;
 }
 
+const macroOf = x => ({ porzione_g: num(String(x.porzione_g ?? '').replace(',', '.')), kcal100: num(String(x.kcal100 ?? '').replace(',', '.')),
+  pro100: num(String(x.pro100 ?? '').replace(',', '.')), carb100: num(String(x.carb100 ?? '').replace(',', '.')), fat100: num(String(x.fat100 ?? '').replace(',', '.')) });
+const haMacro = m => m.kcal100 != null || m.pro100 != null || m.carb100 != null || m.fat100 != null;
+
 async function addFoods(list) {
-  const seen = new Set(foods.map(f => f.nome.toLowerCase()));
-  const nuovi = [];
+  const esistenti = new Map(foods.map(f => [f.nome.toLowerCase(), f.id]));
+  const visti = new Set(), nuovi = [], agg = [];
   for (const f of list) {
     const nome = String(f.nome || '').trim(), k = nome.toLowerCase();
-    if (!k || seen.has(k)) continue;
-    seen.add(k);
-    nuovi.push({ nome, categoria: f.categoria || null, regola: f.regola || null });
+    if (!k || visti.has(k)) continue;
+    visti.add(k);
+    const m = macroOf(f);
+    if (esistenti.has(k)) { if (haMacro(m)) agg.push({ id: esistenti.get(k), ...m }); continue; }   // già presente: aggiorno solo i valori
+    nuovi.push({ nome, categoria: f.categoria || null, regola: f.regola || null, ...m });
   }
-  for (let i = 0; i < nuovi.length; i += 100) {
+  let errore = null;
+  for (let i = 0; i < nuovi.length && !errore; i += 100) {
     const { error } = await db.from('foods').insert(nuovi.slice(i, i + 100));
-    if (error) { alert('Importazione non riuscita: ' + error.message); break; }
+    if (error) errore = error;
+  }
+  for (let i = 0; i < agg.length && !errore; i += 10) {
+    const res = await Promise.all(agg.slice(i, i + 10).map(({ id, ...m }) => db.from('foods').update(m).eq('id', id)));
+    errore = res.find(r => r.error)?.error || null;
   }
   await loadFoods();
-  alert(`Aggiunti ${nuovi.length} alimenti. Ignorati ${list.length - nuovi.length} (già presenti o vuoti).`);
+  if (errore) { alert('Importazione non riuscita: ' + errore.message); return; }
+  alert(`Aggiunti ${nuovi.length} alimenti, aggiornati i valori nutrizionali di ${agg.length}. Ignorati ${list.length - nuovi.length - agg.length} (già presenti o vuoti).`);
 }
 
 $('foodExBtn').addEventListener('click', () => addFoods(ESEMPIO.map(s => { const [categoria, nome, regola] = s.split('|'); return { categoria, nome, regola }; })));
@@ -1082,8 +1110,8 @@ $('foodFile').addEventListener('change', e => {
       list = r.data.filter(x => String(x.active).toLowerCase() !== 'false')
         .map(x => ({ nome: x.option_text, categoria: normPortata(x.portata_label), regola: x.max_per_week ? `max ${Number(x.max_per_week)} a settimana` : '' }));
     } else if (h.includes('nome')) {            // formato semplice: nome, categoria, regola
-      list = r.data.map(x => ({ nome: x.nome, categoria: normPortata(x.categoria), regola: x.regola }));
-    } else { alert('Il CSV deve avere una colonna “nome” (facoltative: “categoria” e “regola”).'); return; }
+      list = r.data.map(x => ({ nome: x.nome, categoria: normPortata(x.categoria), regola: x.regola, porzione_g: x.porzione_g, kcal100: x.kcal100, pro100: x.pro100, carb100: x.carb100, fat100: x.fat100 }));
+    } else { alert('Il CSV deve avere una colonna “nome” (facoltative: categoria, regola, porzione_g, kcal100, pro100, carb100, fat100).'); return; }
     await addFoods(list);
   } });
 });
