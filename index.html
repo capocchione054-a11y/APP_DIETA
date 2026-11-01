@@ -122,6 +122,8 @@
   .row.p { grid-template-columns: 1.2fr 1fr 1.3fr 1.6fr; cursor: default; }
   .row.w:not(.head):hover, .row.p:not(.head):hover { background: var(--surface); }
   .nav { display: flex; gap: 8px; }
+  .chk { display: flex; gap: 8px; align-items: center; color: var(--ink); font-size: 16px; margin: 0; }
+  .chk input { width: auto; padding: 0; }
   .meal { margin-top: 14px; padding-top: 14px; }
   .meal-h { display: grid; grid-template-columns: 1fr 110px auto; gap: 10px; align-items: end; }
   .ptr { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
@@ -288,6 +290,7 @@
         <div><h2 id="dietTitle"></h2><p id="dietMeta"></p></div>
         <div class="actions">
           <button class="btn danger" id="dietDelBtn" type="button">Elimina dieta</button>
+          <button class="btn" id="propBtn" type="button">Proponi opzioni</button>
           <button class="btn" id="pdfBtn" type="button">Scarica PDF</button>
           <button class="btn primary" id="mealSaveBtn" type="button">Salva pasti</button>
         </div>
@@ -378,6 +381,25 @@
       <span class="spacer"></span>
       <button class="btn" id="foodCancelBtn" type="button">Annulla</button>
       <button class="btn primary" type="submit">Salva</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- FINESTRA PROPOSTA OPZIONI -->
+<dialog id="propDlg">
+  <form id="propForm" method="dialog">
+    <div class="dlg-head"><h2>Proponi le opzioni</h2></div>
+    <div class="dlg-body">
+      <div class="full" style="color:var(--muted);font-size:14px">Le opzioni vengono scelte dalla libreria Alimenti con regole fisse, senza intelligenza artificiale. I singoli alimenti non hanno i macro, quindi l’obiettivo in kcal di ogni pasto resta indicativo.</div>
+      <div><label for="p_n">Opzioni per portata</label><select id="p_n"><option>2</option><option selected>3</option><option>4</option><option>5</option></select></div>
+      <div class="full"><label class="chk"><input type="checkbox" id="p_var" checked> Varia le opzioni durante la settimana</label></div>
+      <div class="full"><label class="chk"><input type="checkbox" id="p_repl"> Sostituisci le opzioni già inserite</label></div>
+      <div class="full warn" id="p_escl" style="margin-top:0"></div>
+    </div>
+    <div class="dlg-foot">
+      <span class="spacer"></span>
+      <button class="btn" id="propCancelBtn" type="button">Annulla</button>
+      <button class="btn primary" type="submit">Proponi</button>
     </div>
   </form>
 </dialog>
@@ -1187,6 +1209,96 @@ $('mealSaveBtn').addEventListener('click', async () => {
   }
   btn.disabled = false;
   $('mealMsg').textContent = 'Pasti salvati.';
+});
+
+/* --- Proposta automatica delle opzioni (regole fisse, senza intelligenza artificiale) --- */
+// Parole collegate a intolleranze e allergie comuni (l'esclusione si basa sul testo del nome)
+const SINONIMI = {
+  lattosio: ['latte', 'yogurt', 'mozzarella', 'ricotta', 'formagg', 'parmigian', 'burro', 'panna', 'fior di latte', 'kinder', 'plumcake'],
+  latte: ['latte', 'yogurt', 'mozzarella', 'ricotta', 'formagg', 'parmigian', 'burro', 'panna', 'fior di latte', 'kinder', 'plumcake'],
+  glutine: ['pasta', 'pane', 'pan ', 'biscott', 'fett', 'cracker', 'fresella', 'granetti', 'cereali', 'orzo', 'couscous', 'gnocchi', 'pizza', 'panino', 'avena', 'farro', 'plumcake', 'crostini', 'grissini', 'kinder', 'pavesini', 'tuc', 'dolce'],
+  uov: ['uova', 'uovo', 'albumi', 'plumcake'],
+  'frutta secca': ['frutta secca', 'noci', 'nocciol', 'mandorl', 'pistacc', 'arachid'],
+  noci: ['frutta secca', 'noci', 'nocciol', 'mandorl', 'pistacc'],
+  pesce: ['pesce', 'salmone', 'tonno', 'merluzzo', 'platessa', 'sgombro', 'branzino', 'orata'],
+  soia: ['soia'], arachid: ['arachid'], crostacei: ['gamber', 'scamp', 'crostace', 'granch']
+};
+
+function esclusioni() {
+  const testo = [current.allergie, current.intolleranze].filter(Boolean).join(',').toLowerCase();
+  const termini = new Set();
+  testo.split(/[,;\n/]|\se\s/).map(t => t.trim()).filter(t => t.length >= 3).forEach(t => {
+    termini.add(t);
+    Object.entries(SINONIMI).forEach(([k, v]) => { if (t.includes(k)) v.forEach(x => termini.add(x)); });
+  });
+  return [...termini];
+}
+
+const mescola = a => { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+function proponi(n, varia, sostituisci) {
+  const termini = esclusioni();
+  const ammesso = f => !termini.some(t => f.nome.toLowerCase().includes(t));
+  const limite = f => { const m = (f.regola || '').match(/max\s+(\d+)/i); return m ? Number(m[1]) : null; };
+  const gruppo = f => `${f.categoria}|${f.regola}`;
+  const usi = {}, escluse = new Set(), vuote = [];
+  let aggiunte = 0, saltate = 0;
+  const libero = f => limite(f) == null || (usi[gruppo(f)] || 0) < limite(f);
+  const usa = f => { if (limite(f) != null) usi[gruppo(f)] = (usi[gruppo(f)] || 0) + 1; };
+
+  M.meals.forEach(m => m.portate.forEach(p => {
+    if (m.items.some(it => it.portata === p)) {
+      if (!sostituisci) { saltate++; return; }
+      m.items = m.items.filter(it => it.portata !== p);
+    }
+    const tutti = foods.filter(f => f.categoria === p);
+    tutti.filter(f => !ammesso(f)).forEach(f => escluse.add(f.id));
+    const lista = mescola(tutti.filter(ammesso));
+    if (!lista.length) { vuote.push(`${m.nome}: ${p}`); return; }
+    const aggiungi = (f, giorno) => { m.items.push({ food_id: f.id, nome: f.nome, portata: p, giorno }); usa(f); aggiunte++; };
+
+    if (!varia) {                                  // stesse opzioni tutti i giorni
+      let k = 0;
+      for (const f of lista) {
+        if (k >= n) break;
+        if (limite(f) != null) { if (!libero(f)) continue; aggiungi(f, 1 + Math.floor(Math.random() * 7)); }   // le regole settimanali valgono per un giorno preciso
+        else aggiungi(f, null);
+        k++;
+      }
+    } else {                                       // opzioni diverse nei vari giorni
+      let ptr = 0;
+      for (let giorno = 1; giorno <= 7; giorno++) {
+        const scelte = new Set();
+        for (let t = 0; t < lista.length && scelte.size < Math.min(n, lista.length); t++) {
+          const f = lista[(ptr + t) % lista.length];
+          if (scelte.has(f.id) || !libero(f)) continue;
+          scelte.add(f.id); aggiungi(f, giorno);
+        }
+        ptr = (ptr + scelte.size) % lista.length;
+      }
+    }
+  }));
+
+  let msg = `Proposte ${aggiunte} opzioni. `;
+  if (escluse.size) msg += `Escluse ${escluse.size} per allergie e intolleranze: ricontrolla sempre la lista. `;
+  if (saltate) msg += `${saltate} portate avevano già opzioni (spunta “Sostituisci” per rigenerarle). `;
+  if (vuote.length) msg += `Nessun alimento disponibile per: ${vuote.join(', ')}. `;
+  return msg + 'Controlla e premi “Salva pasti”.';
+}
+
+$('propBtn').addEventListener('click', () => {
+  const t = esclusioni();
+  $('p_escl').textContent = t.length
+    ? `Escluderò gli alimenti che contengono: ${t.join(', ')}. L’elenco si basa sul testo di allergie e intolleranze della scheda e può essere incompleto.`
+    : 'Nella scheda del cliente non risultano allergie o intolleranze: nessuna esclusione.';
+  $('propDlg').showModal();
+});
+$('propCancelBtn').addEventListener('click', () => $('propDlg').close());
+$('propForm').addEventListener('submit', e => {
+  e.preventDefault();
+  $('mealMsg').textContent = proponi(Number($('p_n').value), $('p_var').checked, $('p_repl').checked);
+  $('propDlg').close();
+  renderMeals();
 });
 
 $('pdfBtn').addEventListener('click', () => {
